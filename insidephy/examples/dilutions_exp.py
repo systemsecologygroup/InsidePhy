@@ -7,9 +7,7 @@ import matplotlib.colors as mc
 from matplotlib import ticker
 import matplotlib.lines as mlines
 import dask
-# from dask.distributed import Client
 
-# client = Client(processes=False)
 dask.config.set(scheduler='processes')
 
 
@@ -55,27 +53,6 @@ def sim_run():
 
     return dask.compute(sbmc_out, sbmi_out)
 
-# ([sbmc_D00, sbmc_D25, sbmc_D50],) = dask.compute(sbmc_out)
-# ([sbmi_D00, sbmi_D25, sbmi_D50],) = dask.compute(sbmi_out)
-# ([sbmc_D00, sbmc_D25, sbmc_D50], [sbmi_D00, sbmi_D25, sbmi_D50]) = sim_run()
-# """
-# sbmc_D00 = SBMc(ini_resource=ini_resource, ini_density=ini_density, minsize=minsize, maxsize=maxsize,
-#                 spp_names=spp_names, numsc=numsc, tend=tend, dilution_rate=dilution_rate[0], volume=volume)
-# sbmi_D00 = SBMi(ini_resource=ini_resource, ini_density=ini_density, minsize=minsize, maxsize=maxsize,
-#                 spp_names=spp_names, nsi_spp=nsi_spp, nsi_min=100, nsi_max=1000, volume=volume,
-#                 time_step=time_step, time_end=tend, print_time_step=1, dilution_rate=dilution_rate[0])
-# sbmc_D25 = SBMc(ini_resource=ini_resource, ini_density=ini_density, minsize=minsize, maxsize=maxsize,
-#                 spp_names=spp_names, numsc=numsc, tend=tend, dilution_rate=dilution_rate[1], volume=volume)
-# sbmi_D25 = SBMi(ini_resource=ini_resource, ini_density=ini_density, minsize=minsize, maxsize=maxsize,
-#                 spp_names=spp_names, nsi_spp=nsi_spp, nsi_min=100, nsi_max=1000, volume=volume,
-#                 time_step=time_step, time_end=tend, print_time_step=1, dilution_rate=dilution_rate[1])
-# sbmc_D50 = SBMc(ini_resource=ini_resource, ini_density=ini_density, minsize=minsize, maxsize=maxsize,
-#                 spp_names=spp_names, numsc=numsc, tend=tend, dilution_rate=dilution_rate[2], volume=volume)
-# sbmi_D50 = SBMi(ini_resource=ini_resource, ini_density=ini_density, minsize=minsize, maxsize=maxsize,
-#                 spp_names=spp_names, nsi_spp=nsi_spp, nsi_min=100, nsi_max=1000, volume=volume,
-#                 time_step=time_step, time_end=tend, print_time_step=1, dilution_rate=dilution_rate[2])
-# """
-
 
 def plots():
     ([sbmc_D00, sbmc_D25, sbmc_D50], [sbmi_D00, sbmi_D25, sbmi_D50]) = sim_run()
@@ -90,16 +67,12 @@ def plots():
     X25_biom, Y25_biom, Z25_biom = intp_size_spec(sbmi_D25.agents_size, sbmi_D25.agents_biomass, sbmi_D25.time, size_range)
     X50_biom, Y50_biom, Z50_biom = intp_size_spec(sbmi_D50.agents_size, sbmi_D50.agents_biomass, sbmi_D50.time, size_range)
 
-    # vmax = max(sbmc_D00.abundance.max(), sbmc_D25.abundance.max(), sbmc_D50.abundance.max(), np.nanmax(Z00),
-    #           np.nanmax(Z25), np.nanmax(Z50))
-    # vmin = min(sbmc_D00.abundance.min(), sbmc_D25.abundance.min(), sbmc_D50.abundance.min(), np.nanmin(Z00),
-    #           np.nanmin(Z25), np.nanmin(Z50))
-    levs = np.logspace(np.log10(1e2), np.log10(1e7), 100)  # np.power(10, np.arange(1,9)) #np.arange(1, 1e6)
+    levs = np.logspace(np.log10(1e2), np.log10(1e7), 100)
     logformat = ticker.LogFormatterMathtext()  # LogFormatter(10)
-    norm = mc.BoundaryNorm(levs, 256)  # mc.LogNorm(vmin=vmin, vmax=vmax)
+    norm = mc.BoundaryNorm(levs, 256)
     ticks = np.logspace(2, 7, 6)
     levs_biom = np.logspace(np.log10(1e-4), np.log10(1e1), 100)
-    norm_biom = mc.BoundaryNorm(levs_biom, 256)  # mc.LogNorm(vmin=np.log10(1e-3), vmax=np.log10(1e1))#
+    norm_biom = mc.BoundaryNorm(levs_biom, 256)
     ticks_biom = np.logspace(-4, 1, 6)
 
     cmap = 'bone_r'  # 'jet'
@@ -147,16 +120,13 @@ def plots():
     axs1[5, 0].plot(sbmi_D00.time, pwm(Y00.T, Z00.T), c='steelblue', lw=3.0)
     axs1[5, 1].plot(sbmi_D25.time, pwm(Y25.T, Z25.T), c='steelblue', lw=3.0)
     axs1[5, 2].plot(sbmi_D50.time, pwm(Y50.T, Z50.T), c='steelblue', lw=3.0)
-    axs1[4, 0].plot(sbmc_D00.time,#[:-1],
-                    #sbmc_D00.mus,
+    axs1[4, 0].plot(sbmc_D00.time,
                     np.tile(sbmc_D00.size_range, (len(sbmc_D00.time), 1))[-1, np.argmax(sbmc_D00.mus, axis=1)],
                     ls='-', c='orange', lw=3.0, alpha=0.7)
-    axs1[4, 1].plot(sbmc_D25.time,#[:-1],
-                    #sbmc_D25.mus,
+    axs1[4, 1].plot(sbmc_D25.time,
                     np.tile(sbmc_D25.size_range, (len(sbmc_D25.time), 1))[-1, np.argmax(sbmc_D25.mus, axis=1)],
                     ls='-', c='orange', lw=3.0, alpha=0.7)
-    axs1[4, 2].plot(sbmc_D50.time,#[:-1],
-                    #sbmc_D50.mus,
+    axs1[4, 2].plot(sbmc_D50.time,
                     np.tile(sbmc_D50.size_range, (len(sbmc_D50.time), 1))[-1, np.argmax(sbmc_D50.mus, axis=1)],
                     ls='-', c='orange', lw=3.0, alpha=0.7)
     axs1[5, 0].plot(sbmi_D00.time, [sbmi_D00.agents_size[:, i, j] for i, j in
@@ -226,16 +196,13 @@ def plots():
     axs2[1, 0].plot(sbmi_D00.time, pwm(Y00_biom.T, Z00_biom.T), c='steelblue', lw=3.0)
     axs2[1, 1].plot(sbmi_D25.time, pwm(Y25_biom.T, Z25_biom.T), c='steelblue', lw=3.0)
     axs2[1, 2].plot(sbmi_D50.time, pwm(Y50_biom.T, Z50_biom.T), c='steelblue', lw=3.0)
-    axs2[0, 0].plot(sbmc_D00.time,#[:-1],
-                    #sbmc_D00.mus,
+    axs2[0, 0].plot(sbmc_D00.time,
                     np.tile(sbmc_D00.size_range, (len(sbmc_D00.time), 1))[-1, np.argmax(sbmc_D00.mus, axis=1)],
                     ls='-', c='orange', lw=3.0, alpha=0.7)
-    axs2[0, 1].plot(sbmc_D25.time,#[:-1],
-                    #sbmc_D25.mus,
+    axs2[0, 1].plot(sbmc_D25.time,
                     np.tile(sbmc_D25.size_range, (len(sbmc_D25.time), 1))[-1, np.argmax(sbmc_D25.mus, axis=1)],
                     ls='-', c='orange', lw=3.0, alpha=0.7)
-    axs2[0, 2].plot(sbmc_D50.time,#[:-1],
-                    #sbmc_D50.mus,
+    axs2[0, 2].plot(sbmc_D50.time,
                     np.tile(sbmc_D50.size_range, (len(sbmc_D50.time), 1))[-1, np.argmax(sbmc_D50.mus, axis=1)],
                     ls='-', c='orange', lw=3.0, alpha=0.7)
     axs2[1, 0].plot(sbmi_D00.time, [sbmi_D00.agents_size[:, i, j] for i, j in
