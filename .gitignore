@@ -1,0 +1,5 @@
+.idea*
+*.egg*
+*.cpython*
+build*
+.DS_Store
