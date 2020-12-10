@@ -6,41 +6,41 @@ import insidephy.size_based_models.allometric_functions as AlloFunc
 
 class SBMc:
     """
-    Size-based model of a group of phytoplankton cells within a size class.
+    Size-based model of phytoplankton size class.
     :return: object with solution of size-based model
     """
 
-    def __init__(self, ini_resource, ini_density, minsize, maxsize, spp_names, numsc,
-                 dilution_rate, volume, t0=0, tend=20, tsteps=100, timeit=False, vectorize=True):
+    def __init__(self, ini_resource, ini_density, min_size, max_size, spp_names, num_sc,
+                 dilution_rate, volume, t0=0, time_end=20, time_steps=100, timeit=False, vectorize=True):
 
         start_comp_time = time.time()
         self.vectorize = vectorize
         self.ini_resource = ini_resource
-        if not all(len(lst) == len(spp_names) for lst in iter([spp_names, ini_density, minsize, maxsize, numsc])):
+        if not all(len(lst) == len(spp_names) for lst in iter([spp_names, ini_density, min_size, max_size, num_sc])):
             raise ValueError("initial values for species must be lists of the same length")
-        self.ini_density = np.concatenate(([[ini_density[i]/n for l in range(n)] for i, n in enumerate(numsc)]), 0)
-        self.minsize = minsize
-        self.maxsize = maxsize
-        self.numsc = numsc
+        self.ini_density = np.concatenate(([[ini_density[i]/n for l in range(n)] for i, n in enumerate(num_sc)]), 0)
+        self.minsize = min_size
+        self.maxsize = max_size
+        self.numsc = num_sc
         self.spp_names = spp_names
         self.dilution_rate = dilution_rate
         self.volume = volume
-        self.size_range = np.concatenate(([np.logspace(np.log10(minsize[n]), np.log10(maxsize[n]), numsc[n])
+        self.size_range = np.concatenate(([np.logspace(np.log10(min_size[n]), np.log10(max_size[n]), num_sc[n])
                                          for n, l in enumerate(spp_names)]), 0)
         self.ini_quota = (AlloFunc.q_max(self.size_range) +
                           AlloFunc.q_min(self.size_range)) / 2.
         self.y0 = np.concatenate(([self.ini_resource],
                                   self.ini_quota,
                                   self.ini_density,
-                                  np.zeros(sum(numsc))), 0)
-        self.time = np.linspace(t0, tend, tsteps)
+                                  np.zeros(sum(num_sc))), 0)
+        self.time = np.linspace(t0, time_end, time_steps)
         solution = odeint(self.syseqns, self.y0, self.time, rtol=1e-12, atol=1e-12)
         self.resource = solution[:, 0]
-        self.quota = solution[:, 1:sum(numsc)+1]
-        self.abundance = solution[:, 1+sum(numsc): 1+sum(numsc)*2]
+        self.quota = solution[:, 1:sum(num_sc) + 1]
+        self.abundance = solution[:, 1+sum(num_sc): 1 + sum(num_sc) * 2]
         self.biomass = self.abundance * AlloFunc.biomass(self.size_range)
-        self.mus = solution[1:, 1+sum(numsc)*2:] - solution[0:-1, 1+sum(numsc)*2:]
-        self.mus = np.append(self.mus, self.mus[-1,:].reshape(1, sum(numsc)), 0) #, np.tile(np.nan, sum(numsc)).reshape(1, sum(numsc)), 0)
+        self.mus = solution[1:, 1 + sum(num_sc) * 2:] - solution[0:-1, 1 + sum(num_sc) * 2:]
+        self.mus = np.append(self.mus, self.mus[-1, :].reshape(1, sum(num_sc)), 0)
 
         if timeit:
             print('SBMc total simulation time %.2f minutes' % ((time.time() - start_comp_time) / 60.))

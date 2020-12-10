@@ -69,9 +69,10 @@ class PhytoCell:
 class SBMi:
     """
     Size-based model of individual phytoplankton cells.
+    :return: object with solution of size-based model
     """
 
-    def __init__(self, ini_resource, ini_density, spp_names, minsize, maxsize,
+    def __init__(self, ini_resource, ini_density, spp_names, min_size, max_size,
                  nsi_spp, nsi_min, nsi_max, dilution_rate,
                  volume, time_end, time_step, print_time_step=1,
                  timeit=False):
@@ -79,12 +80,12 @@ class SBMi:
         self.timeit = timeit
         self.R0 = ini_resource  # initial concentration of resource
         self.R = ini_resource  # concentration of resource
-        if not all(len(lst) == len(spp_names) for lst in iter([spp_names, ini_density, minsize, maxsize, nsi_spp])):
+        if not all(len(lst) == len(spp_names) for lst in iter([spp_names, ini_density, min_size, max_size, nsi_spp])):
             raise ValueError("initial values for species must be lists of the same length")
         self.spp_names = spp_names
         self.nind = ini_density  # initial number of individuals
-        self.minsize = minsize  # Minimum cell size in um^3
-        self.maxsize = maxsize  # Maximum cell size in um^3
+        self.minsize = min_size  # Minimum cell size in um^3
+        self.maxsize = max_size  # Maximum cell size in um^3
         self.nsi_min = nsi_min  # Minimum number of super individuals per species
         self.nsi_max = nsi_max  # Maximum number of super individuals per species
         self.nsi_ave = (nsi_min + nsi_max) // 2  # Average number of super individuals
@@ -279,60 +280,6 @@ class SBMi:
         # numpdead = len(self.ddic)
         # self.ddic.update({kk[0:3] + str(numpdead + nag).zfill(5): pdead[kk] for nag, kk in
         #                   zip(range(len(pdead)), pdead.keys())})
-
-        # resampling of super individuals
-        self.split_combine()
-
-    def update_old(self):
-        # prand = self.pdic.copy()
-        pkeys = list(self.pdic.keys())
-        pdead = {}
-        palive = self.pdic.copy()
-        # Computations for all agents
-        # for i in range(len(prand)):  # - 1
-        for i in range(len(pkeys)):  # - 1
-            # randidx = random.randint(0, len(prand) - 1)
-            # randkey = list(prand.keys())[randidx]
-            # prand.pop(randkey)
-            randidx = random.randint(0, len(pkeys) - 1)
-            randkey = pkeys[randidx]
-            pkeys.remove(randkey)
-            palive[randkey].growth(self.R, self.dt)  # growth of a single phytoplankton agent
-            spp_idx = self.spp_names.index(randkey[0:2])
-            self.R -= palive[randkey].massbalance * self.dt / self.volume  # loss of R due to uptake
-            #       = molN/molC*hour * molC/cell * cell/agent * hour/L
-            #       = molN/L
-            if palive[randkey].biomass > 2 * palive[randkey].ini_biomass:  # Reproduction
-                halfbiomass = palive[randkey].biomass * 0.5
-                halfquota = palive[randkey].quota * palive[randkey].biomass * 0.5 / halfbiomass
-                halfcellsize = palive[randkey].cell_size * 0.5
-                palive[randkey].biomass = halfbiomass  # set biomass to half biomass
-                palive[randkey].quota = halfquota  # set quota to half quota
-                palive[randkey].cell_size = halfcellsize  # set cell size to half cell size
-                maxpalive = np.max([int(key[2:]) for key in palive.keys() if randkey[0:2] in key])
-                newpcellkey = randkey[0:2] + str(maxpalive + 1).zfill(5)  # key of new phytoplankton cell
-                # create new phytoplankton with half cell size, biomass and quota
-                palive.update({newpcellkey: PhytoCell(init_biomass=halfbiomass, init_cell_size=halfcellsize,
-                                                      rep_nind=palive[randkey].rep_nind, init_quota=halfquota)})  #
-                self.nsi_spp[spp_idx] += 1
-            # L = (1. - (self.pdic[randkey].q_min / self.pdic[randkey].quota))  # N limitation term
-            mu_D = self.dilution_rate  # * (1. - L)  # mortality rate 1/day
-            if random.random() < mu_D * self.dt:  # Mortality based on probability based on dilution
-                maxpdead = len(pdead)
-                pdeadkey = 'd' + randkey[0:2] + str(maxpdead + 1).zfill(5)
-                pdead.update({pdeadkey: palive[randkey]})
-                palive.pop(randkey)
-                self.nsi_spp[spp_idx] -= 1
-
-        # Update dictionary of dead and alive phytoplankton agents
-        self.pdic = {}
-        for spp in self.spp_names:
-            len_spp_nsi = len([key for key in palive.keys() if spp in key])
-            self.pdic.update({spp + str(nag).zfill(5): palive[kk] for nag, kk in
-                              zip(range(len_spp_nsi), palive.keys())})
-        numpdead = len(self.ddic)
-        self.ddic.update({kk[0:3] + str(numpdead + nag).zfill(5): pdead[kk] for nag, kk in
-                          zip(range(len(pdead)), pdead.keys())})
 
         # resampling of super individuals
         self.split_combine()
