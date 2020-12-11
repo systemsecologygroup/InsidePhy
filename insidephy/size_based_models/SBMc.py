@@ -10,15 +10,21 @@ class SBMc:
     :return: object with solution of size-based model
     """
 
-    def __init__(self, ini_resource, ini_density, min_size, max_size, spp_names, num_sc,
-                 dilution_rate, volume, t0=0, time_end=20, time_steps=100, timeit=False, vectorize=True):
+    def __init__(self, ini_resource, ini_density, spp_names, min_size, max_size, num_sc,
+                 dilution_rate, volume, time_ini=0, time_end=20, time_steps=100, timeit=False, vectorize=True):
+
+        if not all([isinstance(lst, list) for lst in iter([spp_names, ini_density, min_size, max_size, num_sc])]):
+            raise TypeError('Error on input parameters spp_names, ini_density, min_size, max_size or num_sc. '
+                            'They must be type list.')
+        if not all([len(lst) == len(spp_names) for lst in iter([spp_names, ini_density, min_size, max_size, num_sc])]):
+            raise ValueError("initial values of spp_names, ini_density, min_size, max_size and num_sc "
+                             "must be lists of the same length depending on the number of species use "
+                             "in the simulation")
 
         start_comp_time = time.time()
         self.vectorize = vectorize
         self.ini_resource = ini_resource
-        if not all(len(lst) == len(spp_names) for lst in iter([spp_names, ini_density, min_size, max_size, num_sc])):
-            raise ValueError("initial values for species must be lists of the same length")
-        self.ini_density = np.concatenate(([[ini_density[i]/n for l in range(n)] for i, n in enumerate(num_sc)]), 0)
+        self.ini_density = np.concatenate(([[ini_density[i] / n for l in range(n)] for i, n in enumerate(num_sc)]), 0)
         self.minsize = min_size
         self.maxsize = max_size
         self.numsc = num_sc
@@ -26,18 +32,18 @@ class SBMc:
         self.dilution_rate = dilution_rate
         self.volume = volume
         self.size_range = np.concatenate(([np.logspace(np.log10(min_size[n]), np.log10(max_size[n]), num_sc[n])
-                                         for n, l in enumerate(spp_names)]), 0)
+                                           for n, l in enumerate(spp_names)]), 0)
         self.ini_quota = (AlloFunc.q_max(self.size_range) +
                           AlloFunc.q_min(self.size_range)) / 2.
         self.y0 = np.concatenate(([self.ini_resource],
                                   self.ini_quota,
                                   self.ini_density,
                                   np.zeros(sum(num_sc))), 0)
-        self.time = np.linspace(t0, time_end, time_steps)
+        self.time = np.linspace(time_ini, time_end, time_steps)
         solution = odeint(self.syseqns, self.y0, self.time, rtol=1e-12, atol=1e-12)
         self.resource = solution[:, 0]
         self.quota = solution[:, 1:sum(num_sc) + 1]
-        self.abundance = solution[:, 1+sum(num_sc): 1 + sum(num_sc) * 2]
+        self.abundance = solution[:, 1 + sum(num_sc): 1 + sum(num_sc) * 2]
         self.biomass = self.abundance * AlloFunc.biomass(self.size_range)
         self.mus = solution[1:, 1 + sum(num_sc) * 2:] - solution[0:-1, 1 + sum(num_sc) * 2:]
         self.mus = np.append(self.mus, self.mus[-1, :].reshape(1, sum(num_sc)), 0)
@@ -86,5 +92,5 @@ class SBMc:
                 drqndt[0] -= vsc * Nsc  # Resources
                 drqndt[1 + sc] = vsc - muc * Qsc  # Internal Quota
                 drqndt[1 + sum(self.numsc) + sc] = (muc - self.dilution_rate) * Nsc  # Cell Density
-                drqndt[1 + sum(self.numsc)*2 + sc] = muc
+                drqndt[1 + sum(self.numsc) * 2 + sc] = muc
         return drqndt

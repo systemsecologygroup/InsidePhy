@@ -74,14 +74,20 @@ class SBMi:
 
     def __init__(self, ini_resource, ini_density, spp_names, min_size, max_size,
                  nsi_spp, nsi_min, nsi_max, dilution_rate,
-                 volume, time_end, time_step, print_time_step=1,
+                 volume, time_end=20, time_step=1/24, print_time_step=1,
                  timeit=False):
+        if not all([isinstance(lst, list) for lst in iter([spp_names, ini_density, min_size, max_size, nsi_spp])]):
+            raise TypeError('Error on input parameters spp_names, ini_density, min_size, max_size or nsi_spp. '
+                            'They must be type list.')
+        if not all([len(lst) == len(spp_names) for lst in iter([spp_names, ini_density, min_size, max_size, nsi_spp])]):
+            raise ValueError("initial values of spp_names, ini_density, min_size, max_size and nsi_spp "
+                             "must be lists of the same length depending on the number of species use "
+                             "in the simulation")
 
         self.timeit = timeit
         self.R0 = ini_resource  # initial concentration of resource
         self.R = ini_resource  # concentration of resource
-        if not all(len(lst) == len(spp_names) for lst in iter([spp_names, ini_density, min_size, max_size, nsi_spp])):
-            raise ValueError("initial values for species must be lists of the same length")
+
         self.spp_names = spp_names
         self.nind = ini_density  # initial number of individuals
         self.minsize = min_size  # Minimum cell size in um^3
