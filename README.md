@@ -1,53 +1,115 @@
 # insidephy: Inter- and intraspecific Size Diversity of Phytoplankton
 
-_insidephy_ is a package for modelling inter- and intraspecific 
-size variability of phytoplankton grown under laboratory conditions.
+*insidephy* is a package for modelling inter- and intraspecific 
+size variability of phytoplankton. The package is designed to 
+capture the growth dynamics of phytoplankton species under common
+laboratory conditions, for example using batch cultures or chemostats.
+*insidephy* is an open-source project written in Python, 
+with routines to quantify phytoplankton community size composition
+based on size classes (SBMc) or individuals (SBMi) and with parallelization routines
+to improve the computation capacity of simulation experiments, particularly, 
+those using the individual-based model type.
 
-# Installation
+# Modelling approach
+ We follow a trait-based modelling approach to capture the cell size 
+ variability and to untangle the effects of intra- and interspecific 
+ size variability on the assembly and functioning of phytoplankton 
+ communities. An empirically derived trade-off is constructed based on
+ the allometric relationships between cell size and maximum growth rate, 
+ maximum uptake rate, maximum resource quota, minimum resource quota
+ and nutrient half-saturation. These allometries allow
+ phytoplankton cells sizes with different nutrient competitive abilities
+ to be favoured as resource conditions changes. Therefore, an 
+ environment-mediated trade-off emerges from the combination of the 
+ selected allometries in conjunction with the prevailing resource conditions.
 
-To install and utilize insidephy package a running distribution of Python (preferably 3.7 or above) is required. To install insidephy simply execute on a command line:
-
-> $ pip install insidephy
-
-Or download the tarball of the latest version of the package from the Github repository and install from source as:
+![Schematic and allometries implemented in *insidephy*](/Users/eat/Documents/Projects/Dynatrait/Manuscripts/insidephy/schematic_allo.png)
  
-> $ python setup.py install
+### Size-based model using size classes (SBMc)
+In the package *insidephy*, the module ``SMBc`` contains a class
+of the same name with a single method to quantify the size-based 
+model resolving size classes. The SBMc model type consist of a system
+of ordinary differential equations describing Droop's growth dynamics,
+with state variables for the resource, the internal quota of each 
+size class and the abundance or density of individuals on each size class.
+The model is numerically solved using ``scipy.odeint`` library.
 
-# Usage
+### Size-based model using individuals (SBMi)
+In the package *insidephy*, the module ``SMBi` contains two classes
+one that describes the agent and another with the routines to quantify 
+the size-based model resolving individuals.
 
-Once the package has been successfully installed on python, then specific modules of the insidephy package can be imported, for example, the SBMi model type as:
+The agent class is named ``PhytoCell``, for which the cell size is randomly
+assigned from a provided range (between a minimum and maximum cell size). 
+Using the assigned sizes to each cell, the other eco-physiological traits 
+are determined using allometric relationships. The ``PhytoCell`` agent 
+also has a method to update its growth based on the available resources following 
+Droop's formulation as for SBMc model. 
 
->from insidephy.size_based_models.SBMi import SBMi
+The second class, named ``SBMi``, contains the routines to quantify the size-based model. 
+The model has four main methods, named ``initialize``, ``update``, ``run`` and ``split-combine``.
+The ``initialize`` method creates a given number of phytoplankton cell agents from the class ``PhytoCell`` 
+all agents with a randomly selected size within the specified size range. The ``update`` method
+contains the main rules that dictate how an agent reproduces and dies. The ``run`` method executes 
+the model and saves the result into arrays. Last, the ``split-combine`` method is the resampling 
+algorithm used here to make sure the number of (super) individuals stays within a computationally 
+tractable range. Below there is a flow diagram showing the steps taking during a execution of a single
+time step of the SBMi model. 
 
-To make a simulation first we need to define the initial conditions, notice that some values needs to be provided as a list:
+![Flow diagram of all processes executed during a single time step of SMBi model](/Users/eat/Documents/Projects/Dynatrait/Manuscripts/insidephy/SBMi_flowdiagram.png)
+ 
 
-> ini_resource = 0.002
-> ini_density = [1e5, 1e10]
-> min_size = [1.5e7, 1.5e10]
-> max_size = [2.5e7, 2.5e10]
-> spp_names = [‘Aa’, ‘Bb’]
-> dilution_rate = 0.0
-> volume = 1.0
-> nsi_spp = [50]*2
-> nsi_min = 200
-> nsi_max = 2000
-> time_end = 20
-> time_step = 1 / (24*60)
+## Installation details
 
+To install and utilize *insidephy* package a running distribution 
+of Python (preferably 3.7 or above) is required. To install 
+*insidephy* simply execute on a command line:
+```bash
+$ pip install insidephy
+```
+Or download the tarball for the latest version of the package from
+the GitHub repository and install from the source as:
+```bash
+$ python setup.py install
+```
+##  Basic usage
+
+Once the package has been successfully installed on Python, 
+then specific modules of the *insidephy* package can be imported, 
+for example, the SBMi model type as:
+```python
+from insidephy.size_based_models.SBMi import SBMi
+```
+To make a simulation first we need to define the initial conditions.
+Here notice that some initial values have to be provided as a list:
+```python
+ini_resource = 0.002
+ini_density = [1e5, 1e10]
+min_size = [1.5e7, 1.5e10]
+max_size = [2.5e7, 2.5e10]
+spp_names = ["Aa", "Bb"]
+dilution_rate = 0.0
+volume = 1.0
+nsi_spp = [500, 500]
+nsi_min = 200
+nsi_max = 2000
+time_end = 20
+time_step = 1 / (24*60)
+```
 Then to execute the simulation simply type:
-
-> twospp = SBMi(ini_resource=ini_resource, ini_density=ini_density, minsize=min_size, maxsize=max_size, spp_names=spp_names, dilution_rate=dilution_rate, volume=volume, nsi_spp=nsi_spp, nsi_min=nsi_min, nsi_max=nsi_max, time_step=time_step, time_end=time_end)
-
+```python
+twospp = SBMi(ini_resource=ini_resource, ini_density=ini_density, minsize=min_size, maxsize=max_size, spp_names=spp_names, dilution_rate=dilution_rate, volume=volume, nsi_spp=nsi_spp, nsi_min=nsi_min, nsi_max=nsi_max, time_step=time_step, time_end=time_end)
+```
 The result of the execution will be stored as multidimensional arrays as part of the object twospp. Therefore, the results of the simulation can be accessed as instances of that object using the dot operator, like:
-
-> twospp.resource
-> twospp.biomass
-> twospp.abundance
-> twospp.quota
-> twospp.agents_size
-> twospp.agents_biomass
-> twospp.agents_abundance
-
+```python
+twospp.resource
+twospp.biomass
+twospp.abundance
+twospp.quota
+twospp.agents_size
+twospp.agents_biomass
+twospp.agents_abundance
+```
 
 
 
