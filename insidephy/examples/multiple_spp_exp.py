@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 import pkg_resources
 import dask.array as da
+from pathlib import Path
 
 dask.config.set(scheduler='processes')
 
@@ -66,8 +67,8 @@ def simulations(num_spp_exp, rel_size_range, dilution, volume, sbmc_numsc, max_t
     return dask.compute(sbmc_out, sbmi_out), sp_short_names
 
 
-def run_exp(num_spp_exp, rel_size_range, dilution, volume, max_time,
-            sbmc_numsc, sbmi_nsispp, sbmi_nsimin, sbmi_nsimax, sbmi_ts):
+def run_exp_single_output(num_spp_exp, rel_size_range, dilution, volume, max_time,
+                          sbmc_numsc, sbmi_nsispp, sbmi_nsimin, sbmi_nsimax, sbmi_ts):
     start_comp_time = time.time()
     start_datetime = datetime.now()
     out_filename = 'Multiple_spp_exp_' + str(num_spp_exp).zfill(2) + 'spp' + '.nc'
@@ -88,7 +89,8 @@ def run_exp(num_spp_exp, rel_size_range, dilution, volume, max_time,
         'sbmi_agents_biomass': (
             ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], da.from_array([exp.agents_biomass for exp in sbmi_exp])),
         'sbmi_agents_abundance': (
-            ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], da.from_array([exp.agents_abundance for exp in sbmi_exp])),
+            ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'],
+            da.from_array([exp.agents_abundance for exp in sbmi_exp])),
         'sbmi_agents_growth': (
             ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], da.from_array([exp.agents_growth for exp in sbmi_exp])),
         'sbmi_resource': (['exp_num', 'time_sbmi'], da.from_array([exp.resource for exp in sbmi_exp])),
@@ -143,13 +145,95 @@ def run_exp(num_spp_exp, rel_size_range, dilution, volume, max_time,
           'Total computation time %.2f minutes' % (num_spp_exp, (time.time() - start_comp_time) / 60.))
 
 
-"""(sbmc_exp, sbmi_exp), spp_names = simulations(num_spp_exp=2, rel_size_range=0.25,
-                                                  dilution=0.0, volume=1.0, max_time=10,
-                                                  sbmc_numsc=2*[10], nsispp=2*[11],
-                                                  sbmi_nsimin=10, sbmi_nsimax=100+10*2, sbmi_ts=1/2)"""
+def run_exp_multiple_output(num_spp_exp, rel_size_range, dilution, volume, sbmc_numsc, max_time, sbmi_nsispp,
+                            sbmi_nsimin, sbmi_nsimax, sbmi_ts):
+    start_comp_time = time.time()
+    start_datetime = datetime.now()
+    print('Start of experiments for combinations of %.i species simulations on' % num_spp_exp,
+          start_datetime.strftime("%b-%d-%Y %H:%M:%S"))
 
-"""run_exp(num_spp_exp=2, rel_size_range=0.25,
+    (sbmc_exp, sbmi_exp), spp_names = simulations(num_spp_exp=num_spp_exp, rel_size_range=rel_size_range,
+                                                  dilution=dilution, volume=volume, max_time=max_time,
+                                                  sbmc_numsc=sbmc_numsc, sbmi_nsispp=sbmi_nsispp,
+                                                  sbmi_nsimin=sbmi_nsimin, sbmi_nsimax=sbmi_nsimax, sbmi_ts=sbmi_ts)
+
+    files_path = './Multiple_spp_exp_' + str(num_spp_exp).zfill(2) + 'spp'
+    Path(files_path).mkdir(parents=True, exist_ok=True)
+
+    for exp in range(len(sbmc_exp)):
+        fname = 'Multiple_spp_exp_' + str(num_spp_exp).zfill(2) + 'spp_' + str(exp).zfill(
+            str(len(sbmc_exp)).__len__()) + '.nc'
+        ds_exp = xr.Dataset(data_vars={
+            'sbmi_agents_size': (
+                ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_exp[exp].agents_size[np.newaxis, ...]),
+            'sbmi_agents_biomass': (
+                ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_exp[exp].agents_biomass[np.newaxis, ...]),
+            'sbmi_agents_abundance': (
+                ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_exp[exp].agents_abundance[np.newaxis, ...]),
+            'sbmi_agents_growth': (
+                ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_exp[exp].agents_growth[np.newaxis, ...]),
+            'sbmi_resource': (['exp_num', 'time_sbmi'], sbmi_exp[exp].resource[np.newaxis, ...]),
+            'sbmi_tot_abundance': (['exp_num', 'time_sbmi'], sbmi_exp[exp].abundance[np.newaxis, ...]),
+            'sbmi_tot_biomass': (['exp_num', 'time_sbmi'], sbmi_exp[exp].biomass[np.newaxis, ...]),
+            'sbmi_tot_quota': (['exp_num', 'time_sbmi'], sbmi_exp[exp].quota[np.newaxis, ...]),
+            'sbmi_massbalance': (['exp_num', 'time_sbmi'], sbmi_exp[exp].massbalance[np.newaxis, ...]),
+            'sbmc_size': (['exp_num', 'idx_num_sc'], sbmc_exp[exp].size_range[np.newaxis, ...]),
+            'sbmc_biomass': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_exp[exp].biomass[np.newaxis, ...]),
+            'sbmc_abundance': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_exp[exp].abundance[np.newaxis, ...]),
+            'sbmc_quota': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_exp[exp].quota[np.newaxis, ...]),
+            'sbmc_growth': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_exp[exp].mus[np.newaxis, ...]),
+            'sbmc_resource': (['exp_num', 'time_sbmc'], sbmc_exp[exp].resource[np.newaxis, ...])
+        }, coords={
+            'exp_num': [exp],
+            'spp_num': np.arange(num_spp_exp),
+            'spp_name': (['exp_num', 'spp_num'], np.array(sbmi_exp[exp].spp_names)[np.newaxis, ...]),
+            'time_sbmi': sbmi_exp[0].time,
+            'time_sbmc': sbmc_exp[0].time,
+            'num_agents': np.arange(sbmi_nsimax),
+            'idx_num_sc': np.arange(sum(sbmc_numsc))
+        })
+        ds_exp.attrs['title'] = 'Multiple species experiments'
+        ds_exp.attrs['description'] = 'Experiments for a combination of ' + str(num_spp_exp) + \
+                                      ' species and by using two size-based model types. ' \
+                                      'One model type based on individuals (SBMi) ' \
+                                      'and another type based on size classes (SBMc)'
+        ds_exp.attrs['simulations setup'] = 'relative size range:' + str(rel_size_range) + \
+                                            ', dilution rate:' + str(dilution) + \
+                                            ', volume:' + str(volume) + \
+                                            ', maximum time of simulations:' + str(max_time) + \
+                                            ', initial number of size classes:' + str(sbmc_numsc) + \
+                                            ', initial number of (super) individuals:' + str(sbmi_nsispp) + \
+                                            ', minimum number of (super) individuals:' + str(sbmi_nsimin) + \
+                                            ', maximum number of (super) individuals:' + str(sbmi_nsimax) + \
+                                            ', time step for individual-based model simulations:' + str(sbmi_ts)
+        ds_exp.attrs['time_units'] = 'd (days)'
+        ds_exp.attrs['size_units'] = 'um^3 (cubic micrometers)'
+        ds_exp.attrs['biomass_units'] = 'mol C / cell (mol of carbon per cell)'
+        ds_exp.attrs['abundance_units'] = 'cell / L (cells per litre)'
+        ds_exp.attrs['quota_units'] = 'mol N / mol C * cell (mol of nitrogen per mol of carbon per cell)'
+        ds_exp.attrs['biomass_units'] = 'mol C / cell (mol of carbon per cell)'
+        ds_exp.attrs['growth_units'] = '1 / day (per day)'
+        ds_exp.attrs['resource_units'] = 'uM N (micro Molar of nitrogen)'
+        ds_exp.to_netcdf(files_path + '/' + fname)
+    print('Total computation time %.2f minutes' % ((time.time() - start_comp_time) / 60.))
+
+
+"""
+(sbmc_exp, sbmi_exp), spp_names = simulations(num_spp_exp=2, rel_size_range=0.25,
+                                                  dilution=0.0, volume=1.0, max_time=10,
+                                                  sbmc_numsc=2*[10], sbmi_nsispp=2*[11],
+                                                  sbmi_nsimin=10, sbmi_nsimax=100+10*2, sbmi_ts=1/2)
+"""
+
+"""
+run_exp2(num_spp_exp=2, rel_size_range=0.25,
            dilution=0.0, volume=1.0, max_time=10,
            sbmc_numsc=2*[10], sbmi_nsispp=2*[11],
            sbmi_nsimin=10, sbmi_nsimax=100+10*2, sbmi_ts=1/2)
+"""
+
+"""
+ds0 = xr.open_dataset('./Multiple_spp_exp_02spp/Multiple_spp_exp_02spp_000.nc')
+
+all_ds = xr.open_mfdataset('./Multiple_spp_exp_02spp/*.nc', combine='by_coords', concat_dim='exp_num')
 """
