@@ -218,6 +218,125 @@ def run_exp_multiple_output(num_spp_exp, rel_size_range, dilution, volume, sbmc_
     print('Total computation time %.2f minutes' % ((time.time() - start_comp_time) / 60.))
 
 
+def run_sims(num_spp_exp, rel_size_range, dilution, volume, sbmc_numsc, max_time, sbmi_nsispp,
+             sbmi_nsimin, sbmi_nsimax, sbmi_ts):
+
+    start_comp_time = time.time()
+    start_datetime = datetime.now()
+    print('Start of experiments for combinations of %.i species on' % num_spp_exp,
+          start_datetime.strftime("%b-%d-%Y %H:%M:%S"))
+
+    data_path = pkg_resources.resource_filename('insidephy.data', 'maranon_2013EcoLet_data.h5')
+    allometries = pd.read_hdf(data_path, 'allodtf')
+    cultures = pd.read_hdf(data_path, 'batchdtf')
+
+    spp_list = list(cultures.groupby('Species').groups.keys())
+    spp_exps = list(combinations(spp_list, num_spp_exp))
+    spp_resource = cultures.groupby('Species').first().NO3_uM
+    spp_abundance = cultures.groupby('Species').first().Abun_cellmL * 1e3 / 1.
+    spp_size = allometries.groupby('Species').first().Vcell
+
+    init_r = [[spp_resource[sp] for sp in exp] for exp in spp_exps]
+    init_d = [[spp_abundance[sp] for sp in exp] for exp in spp_exps]
+    init_min_size = [[spp_size[sp] - (spp_size[sp] * rel_size_range) for sp in exp] for exp in spp_exps]
+    init_max_size = [[spp_size[sp] + (spp_size[sp] * rel_size_range) for sp in exp] for exp in spp_exps]
+    sp_short_names = [[sp[0] + sp[search('_', sp).span()[1]] for sp in exp] for exp in spp_exps]
+
+    fpath = './Multiple_spp_exp_' + str(num_spp_exp).zfill(2) + 'spp'
+    Path(fpath).mkdir(parents=True, exist_ok=True)
+
+    ds_attrs = {'title': 'Multiple species experiments',
+                'description': 'Experiments for a combination of ' + str(num_spp_exp) +
+                               ' species and by using two size-based model types. '
+                               'One model type based on individuals (SBMi) '
+                               'and another type based on size classes (SBMc)',
+                'simulations setup': 'relative size range:' + str(rel_size_range) +
+                                     ', dilution rate:' + str(dilution) +
+                                     ', volume:' + str(volume) +
+                                     ', maximum time of simulations:' + str(max_time) +
+                                     ', initial number of size classes:' + str(sbmc_numsc) +
+                                     ', initial number of (super) individuals:' + str(sbmi_nsispp) +
+                                     ', minimum number of (super) individuals:' + str(sbmi_nsimin) +
+                                     ', maximum number of (super) individuals:' + str(sbmi_nsimax) +
+                                     ', time step for individual-based model simulations:' + str(sbmi_ts),
+                'time_units': 'd (days)',
+                'size_units': 'um^3 (cubic micrometers)',
+                'biomass_units': 'mol C / cell (mol of carbon per cell)',
+                'abundance_units': 'cell / L (cells per litre)',
+                'quota_units': 'mol N / mol C * cell (mol of nitrogen per mol of carbon per cell)',
+                'growth_units': '1 / day (per day)',
+                'resource_units': 'uM N (micro Molar of nitrogen)'
+                }
+
+    ds_out = []
+    for c in range(len(spp_exps)):
+        sbmc = dask.delayed(SBMc)(ini_resource=np.max(init_r[c]) * 1. / 1e6,  # mol N/L
+                                  ini_density=init_d[c],  # cells/L
+                                  min_size=init_min_size[c],  # um^3
+                                  max_size=init_max_size[c],  # um^3
+                                  spp_names=sp_short_names[c],
+                                  dilution_rate=dilution,
+                                  volume=volume,
+                                  num_sc=sbmc_numsc,
+                                  time_end=max_time,
+                                  timeit=False,
+                                  vectorize=True
+                                  )
+
+        sbmi = dask.delayed(SBMi)(ini_resource=np.max(init_r[c]) * 1. / 1e6,  # mol N/L
+                                  ini_density=init_d[c],  # cells/L
+                                  min_size=init_min_size[c],  # um^3
+                                  max_size=init_max_size[c],  # um^3
+                                  spp_names=sp_short_names[c],
+                                  dilution_rate=dilution,
+                                  volume=volume,
+                                  nsi_spp=sbmi_nsispp,
+                                  nsi_min=sbmi_nsimin,
+                                  nsi_max=sbmi_nsimax,
+                                  time_step=sbmi_ts,
+                                  time_end=max_time,
+                                  timeit=False
+                                  )
+
+        ds_exp = dask.delayed(xr.Dataset)(data_vars={
+            'sbmi_agents_size': (
+                ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi.agents_size[np.newaxis, ...]),
+            'sbmi_agents_biomass': (
+                ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi.agents_biomass[np.newaxis, ...]),
+            'sbmi_agents_abundance': (
+                ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi.agents_abundance[np.newaxis, ...]),
+            'sbmi_agents_growth': (
+                ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi.agents_growth[np.newaxis, ...]),
+            'sbmi_resource': (['exp_num', 'time_sbmi'], sbmi.resource[np.newaxis, ...]),
+            'sbmi_tot_abundance': (['exp_num', 'time_sbmi'], sbmi.abundance[np.newaxis, ...]),
+            'sbmi_tot_biomass': (['exp_num', 'time_sbmi'], sbmi.biomass[np.newaxis, ...]),
+            'sbmi_tot_quota': (['exp_num', 'time_sbmi'], sbmi.quota[np.newaxis, ...]),
+            'sbmi_massbalance': (['exp_num', 'time_sbmi'], sbmi.massbalance[np.newaxis, ...]),
+            'sbmc_size': (['exp_num', 'idx_num_sc'], sbmc.size_range[np.newaxis, ...]),
+            'sbmc_biomass': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc.biomass[np.newaxis, ...]),
+            'sbmc_abundance': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc.abundance[np.newaxis, ...]),
+            'sbmc_quota': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc.quota[np.newaxis, ...]),
+            'sbmc_growth': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc.mus[np.newaxis, ...]),
+            'sbmc_resource': (['exp_num', 'time_sbmc'], sbmc.resource[np.newaxis, ...])
+        }, coords={
+            'exp_num': [c],
+            'spp_num': np.arange(num_spp_exp),
+            'spp_name': (['exp_num', 'spp_num'], np.array(sp_short_names[c])[np.newaxis, ...]),
+            'time_sbmi': sbmi.time,
+            'time_sbmc': sbmc.time,
+            'num_agents': np.arange(sbmi_nsimax),
+            'idx_num_sc': np.arange(sum(sbmc_numsc))
+        })
+        ds_exp = dask.delayed(ds_exp.assign_attrs)(ds_attrs)
+        ds_out.append(ds_exp)
+
+    datasets = dask.compute(*ds_out)
+    files_paths = [fpath + '/Multiple_spp_exp_' + str(num_spp_exp).zfill(2) + 'spp_' + str(c).zfill(
+        str(len(spp_exps)).__len__()) + '.nc' for c in range(len(spp_exps))]
+    xr.save_mfdataset(datasets, files_paths)
+    print('Total computation time %.2f minutes' % ((time.time() - start_comp_time) / 60.))
+
+
 """
 (sbmc_exp, sbmi_exp), spp_names = simulations(num_spp_exp=2, rel_size_range=0.25,
                                                   dilution=0.0, volume=1.0, max_time=10,
@@ -236,4 +355,11 @@ run_exp2(num_spp_exp=2, rel_size_range=0.25,
 ds0 = xr.open_dataset('./Multiple_spp_exp_02spp/Multiple_spp_exp_02spp_000.nc')
 
 all_ds = xr.open_mfdataset('./Multiple_spp_exp_02spp/*.nc', combine='by_coords', concat_dim='exp_num')
+"""
+
+"""
+run_simulations(num_spp_exp=2, rel_size_range=0.25,
+           dilution=0.0, volume=1.0, max_time=10,
+           sbmc_numsc=2*[10], sbmi_nsispp=2*[11],
+           sbmi_nsimin=10, sbmi_nsimax=100+10*2, sbmi_ts=1/2)
 """
