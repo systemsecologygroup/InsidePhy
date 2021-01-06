@@ -11,8 +11,9 @@ from datetime import datetime
 import pkg_resources
 import dask.array as da
 from pathlib import Path
+from dask.distributed import Client, LocalCluster, SSHCluster
 
-dask.config.set(scheduler='processes')
+# dask.config.set(scheduler='processes')
 
 
 def simulations(num_spp_exp, rel_size_range, dilution, volume, sbmc_numsc, max_time, sbmi_nsispp,
@@ -219,12 +220,25 @@ def run_exp_multiple_output(num_spp_exp, rel_size_range, dilution, volume, sbmc_
 
 
 def run_sims(num_spp_exp, rel_size_range, dilution, volume, sbmc_numsc, max_time, sbmi_nsispp,
-             sbmi_nsimin, sbmi_nsimax, sbmi_ts):
+             sbmi_nsimin, sbmi_nsimax, sbmi_ts, ssh=False, nprocs=4, nthreads=1, mem_lim=2e9,
+             ssh_username=None, ssh_pw=None):
 
     start_comp_time = time.time()
     start_datetime = datetime.now()
     print('Start of experiments for combinations of %.i species on' % num_spp_exp,
           start_datetime.strftime("%b-%d-%Y %H:%M:%S"))
+
+    if ssh:
+        cluster = SSHCluster(["localhost", "localhost", "localhost", "localhost"],
+                             connect_options={"known_hosts": None,
+                                              "username": ssh_username,
+                                              "password": ssh_pw},
+                             worker_options={"nprocs": nprocs, "nthreads": nthreads, "memory_limit": mem_lim},
+                             scheduler_options={"port": 0, "dashboard_address": ":8787"})
+        client = Client(cluster)
+    else:
+        cluster = LocalCluster(n_workers=nprocs, threads_per_worker=nthreads, memory_limit=mem_lim)
+        client = Client(cluster)
 
     data_path = pkg_resources.resource_filename('insidephy.data', 'maranon_2013EcoLet_data.h5')
     allometries = pd.read_hdf(data_path, 'allodtf')
@@ -329,8 +343,17 @@ def run_sims(num_spp_exp, rel_size_range, dilution, volume, sbmc_numsc, max_time
         })
         ds_exp = dask.delayed(ds_exp.assign_attrs)(ds_attrs)
         ds_out.append(ds_exp)
+        del sbmi
+        del sbmc
 
-    datasets = dask.compute(*ds_out)
+    # datasets = dask.compute(*ds_out)
+
+    futures = client.compute(ds_out)
+
+    datasets = client.gather(futures)
+
+    del futures
+
     files_paths = [fpath + '/Multiple_spp_exp_' + str(num_spp_exp).zfill(2) + 'spp_' + str(c).zfill(
         str(len(spp_exps)).__len__()) + '.nc' for c in range(len(spp_exps))]
     xr.save_mfdataset(datasets, files_paths)
@@ -358,8 +381,24 @@ all_ds = xr.open_mfdataset('./Multiple_spp_exp_02spp/*.nc', combine='by_coords',
 """
 
 """
-run_simulations(num_spp_exp=2, rel_size_range=0.25,
-           dilution=0.0, volume=1.0, max_time=10,
-           sbmc_numsc=2*[10], sbmi_nsispp=2*[11],
-           sbmi_nsimin=10, sbmi_nsimax=100+10*2, sbmi_ts=1/2)
+from insidephy.examples.multiple_spp_exp import run_sims
+from dask.distributed import Client, LocalCluster
+import dask
+
+cluster = LocalCluster(n_workers=4, threads_per_worker=1)
+client = Client(cluster)
+client.dashboard_link
+
+dask.config.set(scheduler='process')
+datasets=run_sims(num_spp_exp=2, rel_size_range=0.25,
+        dilution=0.0, volume=1.0, max_time=10,
+        sbmc_numsc=2*[10], sbmi_nsispp=2*[11],
+        sbmi_nsimin=10, sbmi_nsimax=100+10*2, sbmi_ts=1/2)
+        
+datasets=client.compute(datasets)
+fpath = './Multiple_spp_exp_' + str(2).zfill(2) + 'spp'   
+files_paths = [fpath + '/Multiple_spp_exp_' + str(2).zfill(2) + 'spp_' + str(c).zfill(
+str(231).__len__()) + '.nc' for c in range(231)]
+xr.save_mfdataset(datasets, files_paths)
+
 """
