@@ -12,7 +12,7 @@ import pkg_resources
 import dask.array as da
 import dask.dataframe as dd
 from pathlib import Path
-from dask.distributed import Client, LocalCluster, SSHCluster
+from dask.distributed import Client, LocalCluster, SSHCluster, fire_and_forget
 
 
 # dask.config.set(scheduler='processes')
@@ -222,11 +222,10 @@ def run_exp_multiple_output(num_spp_exp, rel_size_range, dilution, volume, sbmc_
 
 
 def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
-             max_time=20, sbmc_numsc=[10], sbmi_nsispp=[101], sbmi_nsimin=100,
-             sbmi_nsimax=1000, sbmi_ts=1 / 24,
-             ssh=False, ssh_username=None, ssh_pw=None,
-             nprocs=4, nthreads=1, mem_lim=2e9):
-
+                     max_time=20, sbmc_numsc=[10], sbmi_nsispp=[101], sbmi_nsimin=100,
+                     sbmi_nsimax=1000, sbmi_ts=1 / 24,
+                     ssh=False, ssh_username=None, ssh_pw=None,
+                     nprocs=4, nthreads=1, mem_lim=2e9):
     start_comp_time = time.time()
     start_datetime = datetime.now()
     print('Start of experiments for combinations of %.i species on' % num_spp_exp,
@@ -373,8 +372,8 @@ def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
 
 
 def run_sims_futures(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0, max_time=20,
-         sbmc_numsc=[10], sbmc_ts=100, sbmi_nsispp=[101], sbmi_nsimin=100, sbmi_nsimax=1000, sbmi_ts=1 / 24,
-         ssh=False, ssh_username=None, ssh_pw=None, nprocs=4, nthreads=1, mem_lim=2e9):
+                     sbmc_numsc=[10], sbmc_ts=100, sbmi_nsispp=[101], sbmi_nsimin=100, sbmi_nsimax=1000, sbmi_ts=1 / 24,
+                     ssh=False, ssh_username=None, ssh_pw=None, nprocs=4, nthreads=1, mem_lim=2e9):
     start_comp_time = time.time()
     start_datetime = datetime.now()
     print('Start of experiments for combinations of %.i species on' % num_spp_exp,
@@ -456,43 +455,290 @@ def run_sims_futures(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
         sbmi_out.append(sbmi)
         del init_d, init_r, init_min_size, init_max_size, sp_short_names, sbmc, sbmi
 
-    sbmc_size = da.from_array([future.result().size_range for future in sbmc_out])
-    sbmc_biomass = da.from_array([future.result().biomass for future in sbmc_out])
-    sbmc_abundance = da.from_array([future.result().abundance for future in sbmc_out])
-    sbmc_quota = da.from_array([future.result().quota for future in sbmc_out])
-    sbmc_growth = da.from_array([future.result().mus for future in sbmc_out])
-    sbmc_resoruce = da.from_array([future.result().resource for future in sbmc_out])
+    sbmc_size_dat = client.scatter([future.result().size_range for future in sbmc_out])
+    sbmc_size = client.submit(da.from_array, sbmc_size_dat)
+    del sbmc_size_dat
+    sbmc_biomass_dat = client.scatter([future.result().biomass for future in sbmc_out])
+    sbmc_biomass = client.submit(da.from_array, sbmc_biomass_dat)
+    del sbmc_biomass_dat
+    sbmc_abundance_dat = client.scatter([future.result().abundance for future in sbmc_out])
+    sbmc_abundance = client.submit(da.from_array, sbmc_abundance_dat)
+    del sbmc_abundance_dat
+    sbmc_quota_dat = client.scatter([future.result().quota for future in sbmc_out])
+    sbmc_quota = client.submit(da.from_array, sbmc_quota_dat)
+    del sbmc_quota_dat
+    sbmc_growth_dat = client.scatter([future.result().mus for future in sbmc_out])
+    sbmc_growth = client.submit(da.from_array, sbmc_growth_dat)
+    del sbmc_growth_dat
+    sbmc_resoruce_dat = client.scatter([future.result().resource for future in sbmc_out])
+    sbmc_resoruce = client.submit(da.from_array, sbmc_resoruce_dat)
+    del sbmc_resoruce_dat
 
     del sbmc_out
 
-    sbmi_agents_size = da.from_array([future.result().agents_size for future in sbmi_out])
-    sbmi_agents_biomass = da.from_array([future.result().agents_biomass for future in sbmi_out])
-    sbmi_agents_abundance = da.from_array([future.result().agents_abundance for future in sbmi_out])
-    sbmi_agents_growth = da.from_array([future.result().agents_growth for future in sbmi_out])
-    sbmi_resource = da.from_array([future.result().resource for future in sbmi_out])
-    sbmi_tot_abundance = da.from_array([future.result().abundance for future in sbmi_out])
-    sbmi_tot_biomass = da.from_array([future.result().biomass for future in sbmi_out])
-    sbmi_tot_quota = da.from_array([future.result().quota for future in sbmi_out])
-    sbmi_massbalance = da.from_array([future.result().massbalance for future in sbmi_out])
+    sbmi_agents_size_dat = client.scatter([future.result().agents_size for future in sbmi_out])
+    sbmi_agents_size = client.submit(da.from_array, sbmi_agents_size_dat)
+    del sbmi_agents_size_dat
+    sbmi_agents_biomass_dat = client.scatter([future.result().agents_biomass for future in sbmi_out])
+    sbmi_agents_biomass = client.submit(da.from_array, sbmi_agents_biomass_dat)
+    del sbmi_agents_biomass_dat
+    sbmi_agents_abundance_dat = client.scatter([future.result().agents_abundance for future in sbmi_out])
+    sbmi_agents_abundance = client.submit(da.from_array, sbmi_agents_abundance_dat)
+    del sbmi_agents_abundance_dat
+    sbmi_agents_growth_dat = client.scatter([future.result().agents_growth for future in sbmi_out])
+    sbmi_agents_growth = client.submit(da.from_array, sbmi_agents_growth_dat)
+    del sbmi_agents_growth_dat
+    sbmi_resource_dat = client.scatter([future.result().resource for future in sbmi_out])
+    sbmi_resource = client.submit(da.from_array, sbmi_resource_dat)
+    del sbmi_resource_dat
+    sbmi_tot_abundance_dat = client.scatter([future.result().abundance for future in sbmi_out])
+    sbmi_tot_abundance = client.submit(da.from_array, sbmi_tot_abundance_dat)
+    del sbmi_tot_abundance_dat
+    sbmi_tot_biomass_dat = client.scatter([future.result().biomass for future in sbmi_out])
+    sbmi_tot_biomass = client.submit(da.from_array, sbmi_tot_biomass_dat)
+    del sbmi_tot_biomass_dat
+    sbmi_tot_quota_dat = client.scatter([future.result().quota for future in sbmi_out])
+    sbmi_tot_quota = client.submit(da.from_array, sbmi_tot_quota_dat)
+    del sbmi_tot_quota_dat
+    sbmi_massbalance_dat = client.scatter([future.result().massbalance for future in sbmi_out])
+    sbmi_massbalance = client.submit(da.from_array, sbmi_massbalance_dat)
+    del sbmi_massbalance_dat
 
     del sbmi_out
 
     ds_sims = xr.Dataset(data_vars={
-        'sbmi_agents_size': (['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_agents_size),
-        'sbmi_agents_biomass': (['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_agents_biomass),
-        'sbmi_agents_abundance': (['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_agents_abundance),
-        'sbmi_agents_growth': (['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_agents_growth),
-        'sbmi_resource': (['exp_num', 'time_sbmi'], sbmi_resource),
-        'sbmi_tot_abundance': (['exp_num', 'time_sbmi'], sbmi_tot_abundance),
-        'sbmi_tot_biomass': (['exp_num', 'time_sbmi'], sbmi_tot_biomass),
-        'sbmi_tot_quota': (['exp_num', 'time_sbmi'], sbmi_tot_quota),
-        'sbmi_massbalance': (['exp_num', 'time_sbmi'], sbmi_massbalance),
-        'sbmc_size': (['exp_num', 'idx_num_sc'], sbmc_size),
-        'sbmc_biomass': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_biomass),
-        'sbmc_abundance': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_abundance),
-        'sbmc_quota': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_quota),
-        'sbmc_growth': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_growth),
-        'sbmc_resource': (['exp_num', 'time_sbmc'], sbmc_resoruce)
+        'sbmi_agents_size': (['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_agents_size.result()),
+        'sbmi_agents_biomass': (['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_agents_biomass.result()),
+        'sbmi_agents_abundance': (['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_agents_abundance.result()),
+        'sbmi_agents_growth': (['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_agents_growth.result()),
+        'sbmi_resource': (['exp_num', 'time_sbmi'], sbmi_resource.result()),
+        'sbmi_tot_abundance': (['exp_num', 'time_sbmi'], sbmi_tot_abundance.result()),
+        'sbmi_tot_biomass': (['exp_num', 'time_sbmi'], sbmi_tot_biomass.result()),
+        'sbmi_tot_quota': (['exp_num', 'time_sbmi'], sbmi_tot_quota.result()),
+        'sbmi_massbalance': (['exp_num', 'time_sbmi'], sbmi_massbalance.result()),
+        'sbmc_size': (['exp_num', 'idx_num_sc'], sbmc_size.result()),
+        'sbmc_biomass': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_biomass.result()),
+        'sbmc_abundance': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_abundance.result()),
+        'sbmc_quota': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_quota.result()),
+        'sbmc_growth': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_growth.result()),
+        'sbmc_resource': (['exp_num', 'time_sbmc'], sbmc_resoruce.result())
+    },
+        coords={
+            'exp_num': np.arange(len(spp_exps)),
+            'spp_num': np.arange(num_spp_exp),
+            'spp_name_short': (['exp_num', 'spp_num'], np.array(short_names(spp_exps, all_exps=True))),
+            'spp_name_long': (['exp_num', 'spp_num'], np.array(spp_exps)),
+            'time_sbmi': np.arange(max_time + 1),
+            'time_sbmc': np.linspace(0, max_time, sbmc_ts),
+            'num_agents': np.arange(sbmi_nsimax + (sbmi_nsimin * num_spp_exp)),
+            'idx_num_sc': np.arange(sum(sbmc_numsc * num_spp_exp))
+        },
+        attrs={'title': 'Multiple species experiments',
+               'description': 'Experiments for a combination of ' + str(num_spp_exp) +
+                              ' species and by using two size-based model types. '
+                              'One model type based on individuals (SBMi) '
+                              'and another type based on size classes (SBMc)',
+               'simulations setup': 'relative size range:' + str(rel_size_range) +
+                                    ', dilution rate:' + str(dilution) +
+                                    ', volume:' + str(volume) +
+                                    ', maximum time of simulations:' + str(max_time) +
+                                    ', initial number of size classes:' + str(sbmc_numsc) +
+                                    ', initial number of (super) individuals:' + str(sbmi_nsispp) +
+                                    ', minimum number of (super) individuals:' + str(sbmi_nsimin) +
+                                    ', maximum number of (super) individuals:' + str(sbmi_nsimax) +
+                                    ', time step for individual-based model:' + str(sbmi_ts),
+               'time_units': 'd (days)',
+               'size_units': 'um^3 (cubic micrometers)',
+               'biomass_units': 'mol C / cell (mol of carbon per cell)',
+               'abundance_units': 'cell / L (cells per litre)',
+               'quota_units': 'mol N / mol C * cell (mol of nitrogen per mol of carbon per cell)',
+               'growth_units': '1 / day (per day)',
+               'resource_units': 'uM N (micro Molar of nitrogen)'
+               })
+
+    fpath = './Multiple_spp_exp_' + str(num_spp_exp).zfill(2) + 'spp'
+    Path(fpath).mkdir(parents=True, exist_ok=True)
+    exps, datasets = zip(*ds_sims.groupby("exp_num"))
+    paths = [fpath + '/Multiple_spp_exp_' + str(num_spp_exp).zfill(2) + 'spp_' + str(e).zfill(
+        str(len(spp_exps)).__len__()) + '.nc' for e in exps]
+    xr.save_mfdataset(datasets, paths)
+    print('Total computation time %.2f minutes' % ((time.time() - start_comp_time) / 60.))
+
+
+def run_sims_ftest(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0, max_time=20,
+                   sbmc_numsc=[10], sbmc_ts=100, sbmi_nsispp=[101], sbmi_nsimin=100, sbmi_nsimax=1000, sbmi_ts=1 / 24,
+                   ssh=False, ssh_username=None, ssh_pw=None, nprocs=4, nthreads=1, mem_lim=2e9):
+    start_comp_time = time.time()
+    start_datetime = datetime.now()
+    print('Start of experiments for combinations of %.i species on' % num_spp_exp,
+          start_datetime.strftime("%b-%d-%Y %H:%M:%S"))
+
+    if ssh:
+        cluster = SSHCluster(["localhost", "localhost", "localhost", "localhost"],
+                             connect_options={"known_hosts": None,
+                                              "username": ssh_username,
+                                              "password": ssh_pw},
+                             worker_options={"nprocs": nprocs, "nthreads": nthreads, "memory_limit": mem_lim},
+                             scheduler_options={"port": 0, "dashboard_address": ":8787"})
+        client = Client(cluster)
+    else:
+        cluster = LocalCluster(n_workers=nprocs, threads_per_worker=nthreads, memory_limit=mem_lim)
+        client = Client(cluster)
+
+    data_path = pkg_resources.resource_filename('insidephy.data', 'maranon_2013EcoLet_data.h5')
+    allometries = pd.read_hdf(data_path, 'allodtf')
+    cultures = pd.read_hdf(data_path, 'batchdtf')
+
+    spp_list = list(cultures.groupby('Species').groups.keys())
+    spp_resource = cultures.groupby('Species').first().NO3_uM
+    spp_abundance = cultures.groupby('Species').first().Abun_cellmL * 1e3 / 1.
+    spp_size = allometries.groupby('Species').first().Vcell
+
+    spp_exps = list(combinations(spp_list, num_spp_exp))
+
+    def max_init_r(spp_exp_names):
+        return spp_resource.loc[spp_exp_names].values.max() * 1. / 1e6
+
+    def short_names(spp_exp_names, all_exps=False):
+        if all_exps:
+            return [[sp[0] + sp[search('_', sp).span()[1]] for sp in exp] for exp in spp_exps]
+        else:
+            return [sp[0] + sp[search('_', sp).span()[1]] for sp in spp_exp_names]
+
+    sbmc_out = []
+    sbmi_out = []
+    for c in range(len(spp_exps)):
+        spp_exp_list = list(spp_exps[c])
+        init_r = client.submit(max_init_r, spp_exp_list)
+        init_d = client.submit(list, spp_abundance.loc[spp_exp_list].values)
+        init_min_size = client.submit(list, spp_size.loc[spp_exp_list].values -
+                                      (spp_size.loc[spp_exp_list].values * rel_size_range))
+        init_max_size = client.submit(list, spp_size.loc[spp_exp_list].values +
+                                      (spp_size.loc[spp_exp_list].values * rel_size_range))
+        sp_short_names = client.submit(short_names, spp_exp_list)
+
+        sbmc = client.submit(SBMc, ini_resource=init_r,  # mol N/L
+                             ini_density=init_d,  # cells/L
+                             min_size=init_min_size,  # um^3
+                             max_size=init_max_size,  # um^3
+                             spp_names=sp_short_names,
+                             dilution_rate=dilution,
+                             volume=volume,
+                             num_sc=sbmc_numsc * num_spp_exp,
+                             time_end=max_time,
+                             time_steps=sbmc_ts,
+                             timeit=False,
+                             vectorize=True
+                             )
+
+        sbmc_size = client.submit(da.from_array, sbmc.result().size_range)
+        sbmc_biomass = client.submit(da.from_array, sbmc.result().biomass)
+        sbmc_abundance = client.submit(da.from_array, sbmc.result().abundance)
+        sbmc_quota = client.submit(da.from_array, sbmc.result().quota)
+        sbmc_growth = client.submit(da.from_array, sbmc.result().mus)
+        sbmc_resource = client.submit(da.from_array, sbmc.result().resource)
+
+        del sbmc
+        sbmc_out.append([sbmc_size, sbmc_biomass, sbmc_abundance, sbmc_quota, sbmc_growth, sbmc_resource])
+
+        sbmi = client.submit(SBMi, ini_resource=init_r,  # mol N/L
+                             ini_density=init_d,  # cells/L
+                             min_size=init_min_size,  # um^3
+                             max_size=init_max_size,  # um^3
+                             spp_names=sp_short_names,
+                             dilution_rate=dilution,
+                             volume=volume,
+                             nsi_spp=sbmi_nsispp * num_spp_exp,
+                             nsi_min=sbmi_nsimin,
+                             nsi_max=sbmi_nsimax + (sbmi_nsimin * num_spp_exp),
+                             time_step=sbmi_ts,
+                             time_end=max_time,
+                             timeit=False
+                             )
+
+        sbmi_agents_size = client.submit(da.from_array, sbmi.result().agents_size)
+        sbmi_agents_biomass = client.submit(da.from_array, sbmi.result().agents_biomass)
+        sbmi_agents_abundance = client.submit(da.from_array, sbmi.result().agents_abundance)
+        sbmi_agents_growth = client.submit(da.from_array, sbmi.result().agents_growth)
+        sbmi_resource = client.submit(da.from_array, sbmi.result().resource)
+        sbmi_tot_abundance = client.submit(da.from_array, sbmi.result().abundance)
+        sbmi_tot_biomass = client.submit(da.from_array, sbmi.result().biomass)
+        sbmi_tot_quota = client.submit(da.from_array, sbmi.result().quota)
+        sbmi_massbalance = client.submit(da.from_array, sbmi.result().massbalance)
+
+        del sbmi
+        sbmi_out.append([sbmi_agents_size, sbmi_agents_biomass, sbmi_agents_abundance, sbmi_agents_growth,
+                         sbmi_resource, sbmi_tot_abundance, sbmi_tot_biomass, sbmi_tot_quota, sbmi_massbalance])
+
+        del init_d, init_r, init_min_size, init_max_size, sp_short_names
+
+    sbmc_size_dat = client.scatter([exp[0].result() for exp in sbmc_out])
+    sbmc_size = client.submit(da.from_array, sbmc_size_dat)
+    del sbmc_size_dat
+    sbmc_biomass_dat = client.scatter([exp[1].result() for exp in sbmc_out])
+    sbmc_biomass = client.submit(da.from_array, sbmc_biomass_dat)
+    del sbmc_biomass_dat
+    sbmc_abundance_dat = client.scatter([exp[2].result() for exp in sbmc_out])
+    sbmc_abundance = client.submit(da.from_array, sbmc_abundance_dat)
+    del sbmc_abundance_dat
+    sbmc_quota_dat = client.scatter([exp[3].result() for exp in sbmc_out])
+    sbmc_quota = client.submit(da.from_array, sbmc_quota_dat)
+    del sbmc_quota_dat
+    sbmc_growth_dat = client.scatter([exp[4].result() for exp in sbmc_out])
+    sbmc_growth = client.submit(da.from_array, sbmc_growth_dat)
+    del sbmc_growth_dat
+    sbmc_resource_dat = client.scatter([exp[5].result() for exp in sbmc_out])
+    sbmc_resource = client.submit(da.from_array, sbmc_resource_dat)
+    del sbmc_resource_dat
+
+    del sbmc_out
+
+    sbmi_agents_size_dat = client.scatter([exp[0].result() for exp in sbmi_out])
+    sbmi_agents_size = client.submit(da.from_array, sbmi_agents_size_dat)
+    del sbmi_agents_size_dat
+    sbmi_agents_biomass_dat = client.scatter([exp[1].result() for exp in sbmi_out])
+    sbmi_agents_biomass = client.submit(da.from_array, sbmi_agents_biomass_dat)
+    del sbmi_agents_biomass_dat
+    sbmi_agents_abundance_dat = client.scatter([exp[2].result() for exp in sbmi_out])
+    sbmi_agents_abundance = client.submit(da.from_array, sbmi_agents_abundance_dat)
+    del sbmi_agents_abundance_dat
+    sbmi_agents_growth_dat = client.scatter([exp[3].result() for exp in sbmi_out])
+    sbmi_agents_growth = client.submit(da.from_array, sbmi_agents_growth_dat)
+    del sbmi_agents_growth_dat
+    sbmi_resource_dat = client.scatter([exp[4].result() for exp in sbmi_out])
+    sbmi_resource = client.submit(da.from_array, sbmi_resource_dat)
+    del sbmi_resource_dat
+    sbmi_tot_abundance_dat = client.scatter([exp[5].result() for exp in sbmi_out])
+    sbmi_tot_abundance = client.submit(da.from_array, sbmi_tot_abundance_dat)
+    del sbmi_tot_abundance_dat
+    sbmi_tot_biomass_dat = client.scatter([exp[6].result() for exp in sbmi_out])
+    sbmi_tot_biomass = client.submit(da.from_array, sbmi_tot_biomass_dat)
+    del sbmi_tot_biomass_dat
+    sbmi_tot_quota_dat = client.scatter([exp[7].result() for exp in sbmi_out])
+    sbmi_tot_quota = client.submit(da.from_array, sbmi_tot_quota_dat)
+    del sbmi_tot_quota_dat
+    sbmi_massbalance_dat = client.scatter([exp[8].result() for exp in sbmi_out])
+    sbmi_massbalance = client.submit(da.from_array, sbmi_massbalance_dat)
+    del sbmi_massbalance_dat
+
+    del sbmi_out
+
+    ds_sims = xr.Dataset(data_vars={
+        'sbmi_agents_size': (['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_agents_size.result()),
+        'sbmi_agents_biomass': (['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_agents_biomass.result()),
+        'sbmi_agents_abundance': (['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_agents_abundance.result()),
+        'sbmi_agents_growth': (['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_agents_growth.result()),
+        'sbmi_resource': (['exp_num', 'time_sbmi'], sbmi_resource.result()),
+        'sbmi_tot_abundance': (['exp_num', 'time_sbmi'], sbmi_tot_abundance.result()),
+        'sbmi_tot_biomass': (['exp_num', 'time_sbmi'], sbmi_tot_biomass.result()),
+        'sbmi_tot_quota': (['exp_num', 'time_sbmi'], sbmi_tot_quota.result()),
+        'sbmi_massbalance': (['exp_num', 'time_sbmi'], sbmi_massbalance.result()),
+        'sbmc_size': (['exp_num', 'idx_num_sc'], sbmc_size.result()),
+        'sbmc_biomass': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_biomass.result()),
+        'sbmc_abundance': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_abundance.result()),
+        'sbmc_quota': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_quota.result()),
+        'sbmc_growth': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_growth.result()),
+        'sbmc_resource': (['exp_num', 'time_sbmc'], sbmc_resource.result())
     }, coords={
         'exp_num': np.arange(len(spp_exps)),
         'spp_num': np.arange(num_spp_exp),
@@ -528,23 +774,186 @@ def run_sims_futures(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
     fpath = './Multiple_spp_exp_' + str(num_spp_exp).zfill(2) + 'spp'
     Path(fpath).mkdir(parents=True, exist_ok=True)
     exps, datasets = zip(*ds_sims.groupby("exp_num"))
-    paths = [fpath+'/Multiple_spp_exp_' + str(num_spp_exp).zfill(2) + 'spp_' + str(e).zfill(
-             str(len(spp_exps)).__len__()) + '.nc' for e in exps]
+    paths = [fpath + '/Multiple_spp_exp_' + str(num_spp_exp).zfill(2) + 'spp_' + str(e).zfill(
+        str(len(spp_exps)).__len__()) + '.nc' for e in exps]
     xr.save_mfdataset(datasets, paths)
     print('Total computation time %.2f minutes' % ((time.time() - start_comp_time) / 60.))
     # return ds_sims
 
 
-"""
-from insidephy.examples.multiple_spp_exp import sims
-ds = sims(num_spp_exp=2, max_time=10, sbmi_nsispp=[11],
-        sbmi_nsimin=10, sbmi_nsimax=100, sbmi_ts=1/2)
-"""
+def run_sims_dtest(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0, max_time=20,
+                   sbmc_numsc=[10], sbmc_ts=100, sbmi_nsispp=[101], sbmi_nsimin=100, sbmi_nsimax=1000, sbmi_ts=1 / 24,
+                   ssh=False, ssh_username=None, ssh_pw=None, nprocs=4, nthreads=1, mem_lim=2e9):
+    start_comp_time = time.time()
+    start_datetime = datetime.now()
+    print('Start of experiments for combinations of %.i species on' % num_spp_exp,
+          start_datetime.strftime("%b-%d-%Y %H:%M:%S"))
+
+    if ssh:
+        cluster = SSHCluster(["localhost", "localhost", "localhost", "localhost"],
+                             connect_options={"known_hosts": None,
+                                              "username": ssh_username,
+                                              "password": ssh_pw},
+                             worker_options={"nprocs": nprocs, "nthreads": nthreads, "memory_limit": mem_lim},
+                             scheduler_options={"port": 0, "dashboard_address": ":8787"})
+        client = Client(cluster)
+    else:
+        cluster = LocalCluster(n_workers=nprocs, threads_per_worker=nthreads, memory_limit=mem_lim)
+        client = Client(cluster)
+
+    data_path = pkg_resources.resource_filename('insidephy.data', 'maranon_2013EcoLet_data.h5')
+    allometries = pd.read_hdf(data_path, 'allodtf')
+    cultures = pd.read_hdf(data_path, 'batchdtf')
+
+    spp_list = list(cultures.groupby('Species').groups.keys())
+    spp_resource = cultures.groupby('Species').first().NO3_uM
+    spp_abundance = cultures.groupby('Species').first().Abun_cellmL * 1e3 / 1.
+    spp_size = allometries.groupby('Species').first().Vcell
+
+    spp_exps = list(combinations(spp_list, num_spp_exp))
+
+    def max_init_r(spp_exp_names):
+        return spp_resource.loc[spp_exp_names].values.max() * 1. / 1e6
+
+    def short_names(spp_exp_names):
+        return [sp[0] + sp[search('_', sp).span()[1]] for sp in spp_exp_names]
+
+    fpath = './Multiple_spp_exp_' + str(num_spp_exp).zfill(2) + 'spp'
+    Path(fpath).mkdir(parents=True, exist_ok=True)
+
+    ds_futures=[]
+    for c in range(len(spp_exps)):
+        spp_exp_list = list(spp_exps[c])
+        init_r = client.submit(max_init_r, spp_exp_list)
+        init_d = client.submit(list, spp_abundance.loc[spp_exp_list].values)
+        init_min_size = client.submit(list, spp_size.loc[spp_exp_list].values -
+                                      (spp_size.loc[spp_exp_list].values * rel_size_range))
+        init_max_size = client.submit(list, spp_size.loc[spp_exp_list].values +
+                                      (spp_size.loc[spp_exp_list].values * rel_size_range))
+        sp_short_names = client.submit(short_names, spp_exp_list)
+
+        sbmc = client.submit(SBMc, ini_resource=init_r,  # mol N/L
+                             ini_density=init_d,  # cells/L
+                             min_size=init_min_size,  # um^3
+                             max_size=init_max_size,  # um^3
+                             spp_names=sp_short_names,
+                             dilution_rate=dilution,
+                             volume=volume,
+                             num_sc=sbmc_numsc * num_spp_exp,
+                             time_end=max_time,
+                             timeit=False,
+                             vectorize=True
+                             )
+
+        sbmi = client.submit(SBMi, ini_resource=init_r,  # mol N/L
+                             ini_density=init_d,  # cells/L
+                             min_size=init_min_size,  # um^3
+                             max_size=init_max_size,  # um^3
+                             spp_names=sp_short_names,
+                             dilution_rate=dilution,
+                             volume=volume,
+                             nsi_spp=sbmi_nsispp * num_spp_exp,
+                             nsi_min=sbmi_nsimin,
+                             nsi_max=sbmi_nsimax + (sbmi_nsimin * num_spp_exp),
+                             time_step=sbmi_ts,
+                             time_end=max_time,
+                             timeit=False
+                             )
+        sbmc_size = client.scatter(sbmc.result().size_range[np.newaxis, ...])
+        sbmc_biomass = client.scatter(sbmc.result().biomass[np.newaxis, ...])
+        sbmc_abundance = client.scatter(sbmc.result().abundance[np.newaxis, ...])
+        sbmc_quota = client.scatter(sbmc.result().quota[np.newaxis, ...])
+        sbmc_growth = client.scatter(sbmc.result().mus[np.newaxis, ...])
+        sbmc_resource = client.scatter(sbmc.result().resource[np.newaxis, ...])
+
+        sbmi_agents_size = client.scatter(sbmi.result().agents_size[np.newaxis, ...])
+        sbmi_agents_biomass = client.scatter(sbmi.result().agents_biomass[np.newaxis, ...])
+        sbmi_agents_abundance = client.scatter(sbmi.result().agents_abundance[np.newaxis, ...])
+        sbmi_agents_growth = client.scatter(sbmi.result().agents_growth[np.newaxis, ...])
+        sbmi_resource = client.scatter(sbmi.result().resource[np.newaxis, ...])
+        sbmi_tot_abundance = client.scatter(sbmi.result().abundance[np.newaxis, ...])
+        sbmi_tot_biomass = client.scatter(sbmi.result().biomass[np.newaxis, ...])
+        sbmi_tot_quota = client.scatter(sbmi.result().quota[np.newaxis, ...])
+        sbmi_massbalance = client.scatter(sbmi.result().massbalance[np.newaxis, ...])
+
+        ds_exp = client.submit(xr.Dataset, data_vars={
+            'sbmi_agents_size': (
+                ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_agents_size),
+            'sbmi_agents_biomass': (
+                ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_agents_biomass),
+            'sbmi_agents_abundance': (
+                ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_agents_abundance),
+            'sbmi_agents_growth': (
+                ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi_agents_growth),
+            'sbmi_resource': (['exp_num', 'time_sbmi'], sbmi_resource),
+            'sbmi_tot_abundance': (['exp_num', 'time_sbmi'], sbmi_tot_abundance),
+            'sbmi_tot_biomass': (['exp_num', 'time_sbmi'], sbmi_tot_biomass),
+            'sbmi_tot_quota': (['exp_num', 'time_sbmi'], sbmi_tot_quota),
+            'sbmi_massbalance': (['exp_num', 'time_sbmi'], sbmi_massbalance),
+            'sbmc_size': (['exp_num', 'idx_num_sc'], sbmc_size),
+            'sbmc_biomass': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_biomass),
+            'sbmc_abundance': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_abundance),
+            'sbmc_quota': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_quota),
+            'sbmc_growth': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc_growth),
+            'sbmc_resource': (['exp_num', 'time_sbmc'], sbmc_resource)
+        }, coords={
+            'exp_num': [c],
+            'spp_num': np.arange(num_spp_exp),
+            'spp_name_short': (['exp_num', 'spp_num'], np.array(short_names(spp_exps[c]))[np.newaxis, ...]),
+            'spp_name_long': (['exp_num', 'spp_num'], np.array(spp_exps[c])[np.newaxis, ...]),
+            'time_sbmi': np.arange(max_time + 1),
+            'time_sbmc': np.linspace(0, max_time, sbmc_ts),
+            'num_agents': np.arange(sbmi_nsimax + (sbmi_nsimin * num_spp_exp)),
+            'idx_num_sc': np.arange(sum(sbmc_numsc * num_spp_exp))
+        }, attrs={'title': 'Multiple species experiments',
+                  'description': 'Experiments for a combination of ' + str(num_spp_exp) +
+                                 ' species and by using two size-based model types. '
+                                 'One model type based on individuals (SBMi) '
+                                 'and another type based on size classes (SBMc)',
+                  'simulations setup': 'relative size range:' + str(rel_size_range) +
+                                       ', dilution rate:' + str(dilution) +
+                                       ', volume:' + str(volume) +
+                                       ', maximum time of simulations:' + str(max_time) +
+                                       ', initial number of size classes:' + str(sbmc_numsc) +
+                                       ', initial number of (super) individuals:' + str(sbmi_nsispp) +
+                                       ', minimum number of (super) individuals:' + str(sbmi_nsimin) +
+                                       ', maximum number of (super) individuals:' + str(sbmi_nsimax) +
+                                       ', time step for individual-based model simulations:' + str(sbmi_ts),
+                  'time_units': 'd (days)',
+                  'size_units': 'um^3 (cubic micrometers)',
+                  'biomass_units': 'mol C / cell (mol of carbon per cell)',
+                  'abundance_units': 'cell / L (cells per litre)',
+                  'quota_units': 'mol N / mol C * cell (mol of nitrogen per mol of carbon per cell)',
+                  'growth_units': '1 / day (per day)',
+                  'resource_units': 'uM N (micro Molar of nitrogen)'
+                  })
+
+        fname = '/Multiple_spp_exp_' + str(num_spp_exp).zfill(2) + 'spp_' + str(c).zfill(
+            str(len(spp_exps)).__len__()) + '.nc'
+        # ds_dat = client.scatter(ds_exp)
+        ds_out = client.submit(ds_exp.result().to_netcdf, path=fpath + fname)
+        ds_futures.append(ds_out)
+        del init_d, init_r, init_min_size, init_max_size, sp_short_names, sbmi, sbmc, ds_exp, ds_out
+    fire_and_forget(ds_futures)
+    print('Total computation time %.2f minutes' % ((time.time() - start_comp_time) / 60.))
+
 
 """
-from insidephy.examples.multiple_spp_exp import run_sims
-run_sims(num_spp_exp=2, max_time=10, sbmi_nsispp=[11],
+from insidephy.examples.multiple_spp_exp import run_sims_ftest, run_sims_dtest, run_sims_delayed, run_sims_futures
+
+run_sims_dtest(num_spp_exp=2, max_time=10, sbmi_nsispp=[11],
         sbmi_nsimin=10, sbmi_nsimax=100, sbmi_ts=1/2)
+
+run_sims_delayed(num_spp_exp=4, max_time=10, sbmi_nsispp=[11],
+        sbmi_nsimin=10, sbmi_nsimax=100, sbmi_ts=1/2)
+
+run_sims_ftest(num_spp_exp=2, max_time=10, sbmi_nsispp=[11],
+        sbmi_nsimin=10, sbmi_nsimax=100, sbmi_ts=1/2)
+        
+run_sims_futures(num_spp_exp=4, max_time=10, sbmi_nsispp=[11],
+        sbmi_nsimin=10, sbmi_nsimax=100, sbmi_ts=1/2)
+
+
 """
 
 """
