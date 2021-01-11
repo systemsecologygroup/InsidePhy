@@ -12,6 +12,7 @@ import pkg_resources
 import dask.array as da
 from pathlib import Path
 from dask.distributed import Client, LocalCluster, SSHCluster
+from toolz import partition_all
 
 
 # dask.config.set(scheduler='processes')
@@ -639,7 +640,8 @@ def failed_futures2(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0, 
 
 def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0, max_time=20,
                      sbmc_numsc=[10], sbmi_nsispp=[101], sbmi_nsimin=100, sbmi_nsimax=1000, sbmi_ts=1 / 24,
-                     ssh=False, ssh_username=None, ssh_pw=None, nprocs=4, nthreads=1, mem_lim=2e9):
+                     ssh=False, ssh_username=None, ssh_pw=None, nprocs=4, nthreads=1, mem_lim=2e9,
+                     compute_batches=1000):
     start_comp_time = time.time()
     start_datetime = datetime.now()
     print('Start of experiments for combinations of %.i species on' % num_spp_exp,
@@ -678,7 +680,8 @@ def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
         spp_short_names = [sp[0] + sp[search('_', sp).span()[1]] for sp in spp_comb_names]
         arr_sp_short_names = np.array(spp_short_names)[np.newaxis, ...]
         arr_sp_long_names = np.array(spp_comb_names)[np.newaxis, ...]
-        out_list = [ini_r, ini_d, ini_min_size, ini_max_size, spp_short_names, all_spp_comb_exps, arr_sp_short_names, arr_sp_long_names]
+        out_list = [ini_r, ini_d, ini_min_size, ini_max_size, spp_short_names, all_spp_comb_exps, arr_sp_short_names,
+                    arr_sp_long_names]
         return out_list
 
     def save_ncfile(dataset, all_spp_list, exp_num):
@@ -751,37 +754,39 @@ def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
             'sbmc_quota': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc.quota[np.newaxis, ...]),
             'sbmc_growth': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc.mus[np.newaxis, ...]),
             'sbmc_resource': (['exp_num', 'time_sbmc'], sbmc.resource[np.newaxis, ...])
-        }, coords={
-            'exp_num': [exp],
-            'spp_num': np.arange(num_spp_exp),
-            'spp_name_short': (['exp_num', 'spp_num'], out_sp_short_names),
-            'spp_name_long': (['exp_num', 'spp_num'], out_sp_long_names),
-            'time_sbmi': sbmi.time,
-            'time_sbmc': sbmc.time,
-            'num_agents': np.arange(sbmi_nsimax + (sbmi_nsimin * num_spp_exp)),
-            'idx_num_sc': np.arange(sum(sbmc_numsc * num_spp_exp))
-        }, attrs={'title': 'Multiple species experiments',
-                  'description': 'Experiments for a combination of ' + str(num_spp_exp) +
-                                 ' species and by using two size-based model types. '
-                                 'One model type based on individuals (SBMi) '
-                                 'and another type based on size classes (SBMc)',
-                  'simulations setup': 'relative size range:' + str(rel_size_range) +
-                                       ', dilution rate:' + str(dilution) +
-                                       ', volume:' + str(volume) +
-                                       ', maximum time of simulations:' + str(max_time) +
-                                       ', initial number of size classes:' + str(sbmc_numsc) +
-                                       ', initial number of (super) individuals:' + str(sbmi_nsispp) +
-                                       ', minimum number of (super) individuals:' + str(sbmi_nsimin) +
-                                       ', maximum number of (super) individuals:' + str(sbmi_nsimax) +
-                                       ', time step for individual-based model simulations:' + str(sbmi_ts),
-                  'time_units': 'd (days)',
-                  'size_units': 'um^3 (cubic micrometers)',
-                  'biomass_units': 'mol C / cell (mol of carbon per cell)',
-                  'abundance_units': 'cell / L (cells per litre)',
-                  'quota_units': 'mol N / mol C * cell (mol of nitrogen per mol of carbon per cell)',
-                  'growth_units': '1 / day (per day)',
-                  'resource_units': 'uM N (micro Molar of nitrogen)'
-                  })
+        },
+            coords={
+                'exp_num': [exp],
+                'spp_num': np.arange(num_spp_exp),
+                'spp_name_short': (['exp_num', 'spp_num'], out_sp_short_names),
+                'spp_name_long': (['exp_num', 'spp_num'], out_sp_long_names),
+                'time_sbmi': sbmi.time,
+                'time_sbmc': sbmc.time,
+                'num_agents': np.arange(sbmi_nsimax + (sbmi_nsimin * num_spp_exp)),
+                'idx_num_sc': np.arange(sum(sbmc_numsc * num_spp_exp))
+            },
+            attrs={'title': 'Multiple species experiments',
+                   'description': 'Experiments for a combination of ' + str(num_spp_exp) +
+                                  ' species and by using two size-based model types. '
+                                  'One model type based on individuals (SBMi) '
+                                  'and another type based on size classes (SBMc)',
+                   'simulations setup': 'relative size range:' + str(rel_size_range) +
+                                        ', dilution rate:' + str(dilution) +
+                                        ', volume:' + str(volume) +
+                                        ', maximum time of simulations:' + str(max_time) +
+                                        ', initial number of size classes:' + str(sbmc_numsc) +
+                                        ', initial number of (super) individuals:' + str(sbmi_nsispp) +
+                                        ', minimum number of (super) individuals:' + str(sbmi_nsimin) +
+                                        ', maximum number of (super) individuals:' + str(sbmi_nsimax) +
+                                        ', time step for individual-based model simulations:' + str(sbmi_ts),
+                   'time_units': 'd (days)',
+                   'size_units': 'um^3 (cubic micrometers)',
+                   'biomass_units': 'mol C / cell (mol of carbon per cell)',
+                   'abundance_units': 'cell / L (cells per litre)',
+                   'quota_units': 'mol N / mol C * cell (mol of nitrogen per mol of carbon per cell)',
+                   'growth_units': '1 / day (per day)',
+                   'resource_units': 'uM N (micro Molar of nitrogen)'
+                   })
 
         del sbmi, sbmc, out_sp_short_names, out_sp_long_names
 
@@ -791,7 +796,11 @@ def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
 
         del ds_exp, ds_out, all_spp_comb, sp_short_names
 
-    dask.compute(*ds_delayed)
+    # dask.compute(*ds_delayed)
+    batches = list(partition_all(compute_batches, ds_delayed))
+    for batch in batches:
+        dask.compute(*batch)
+
     print('Total computation time %.2f minutes' % ((time.time() - start_comp_time) / 60.))
     # client.close()
 
@@ -1047,7 +1056,8 @@ run_sims_delayed(num_spp_exp=2, max_time=10, sbmi_nsispp=[11],
 run_sims_futures(num_spp_exp=2, max_time=10, sbmi_nsispp=[11],
         sbmi_nsimin=10, sbmi_nsimax=100, sbmi_ts=1/2)
 
-
+import xarray as xr
+all_ds = xr.open_mfdataset('./Multiple_spp_exp_02spp/*.nc', combine='by_coords', concat_dim='exp_num')
 """
 
 """
