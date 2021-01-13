@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="insidephy",
-    version="0.0.1b8",
+    version="0.0.1b9",
     author="Esteban Acevedo-Trejos",
     author_email="esteban.acevedo@leibniz-zmt.de",
     description="Insidephy: A package for modelling inter- and intraspecific size variability of phytoplankton",
