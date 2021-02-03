@@ -7,8 +7,9 @@ import matplotlib.colors as mc
 from matplotlib import ticker
 import matplotlib.lines as mlines
 import dask
+from dask.distributed import Client, LocalCluster
 
-dask.config.set(scheduler='processes')
+# dask.config.set(scheduler='processes')
 
 
 def intp_size_spec(agents_size, agents_weight, time_arr, sizerange):
@@ -27,7 +28,10 @@ def pwm(size, weight, axis=1):
     return np.nansum(size * weight, axis=1) / np.nansum(weight, axis=axis)
 
 
-def sim_run():
+def sim_run(nprocs=4, nthreads=1, mem_lim=2e9):
+    cluster = LocalCluster(n_workers=nprocs, threads_per_worker=nthreads, memory_limit=mem_lim)
+    client = Client(cluster)
+
     ini_resource = 0.0002
     ini_density = [1e6]
     minsize = [1e-1]
@@ -37,21 +41,24 @@ def sim_run():
     numsc = [100]
     tend = 50
     dilution_rate = [0.0, 0.25, 0.50]
-    time_step = 1 / (24 * 60)
+    time_step = 1 / 24
     volume = 1.0
 
     sbmc_out = []
     sbmi_out = []
     for dr in dilution_rate:
-        sbmc = dask.delayed(SBMc)(ini_resource=ini_resource, ini_density=ini_density, minsize=minsize, maxsize=maxsize,
-                                  spp_names=spp_names, numsc=numsc, tend=tend, dilution_rate=dr, volume=volume)
-        sbmi = dask.delayed(SBMi)(ini_resource=ini_resource, ini_density=ini_density, minsize=minsize, maxsize=maxsize,
+        sbmc = dask.delayed(SBMc)(ini_resource=ini_resource, ini_density=ini_density, min_size=minsize, max_size=maxsize,
+                                  spp_names=spp_names, num_sc=numsc, time_end=tend, dilution_rate=dr, volume=volume)
+        sbmi = dask.delayed(SBMi)(ini_resource=ini_resource, ini_density=ini_density, min_size=minsize, max_size=maxsize,
                                   spp_names=spp_names, nsi_spp=nsi_spp, nsi_min=100, nsi_max=1000, volume=volume,
                                   time_step=time_step, time_end=tend, print_time_step=1, dilution_rate=dr)
         sbmc_out.append(sbmc)
         sbmi_out.append(sbmi)
 
-    return dask.compute(sbmc_out, sbmi_out)
+    output = dask.compute(sbmc_out, sbmi_out)
+    client.close()
+    cluster.close()
+    return output
 
 
 def plots():
@@ -152,7 +159,7 @@ def plots():
     axs1[3, 0].set_yticks([1e-3, 1e0, 1e3])
     axs1[4, 0].set_yticks([1e-1, 1e3, 1e8])
     axs1[5, 0].set_yticks([1e-1, 1e3, 1e8])
-    axs1[0, 0].set_ylabel('Resource\n[mM N]', weight='bold')
+    axs1[0, 0].set_ylabel('Nutrients\n[mM N]', weight='bold')
     axs1[1, 0].set_ylabel('PON\n[mM N]', weight='bold')
     axs1[2, 0].set_ylabel('Abundance\n[cells L$^{-1}$]', weight='bold')
     axs1[3, 0].set_ylabel('Biomass\n[mM C]', weight='bold')

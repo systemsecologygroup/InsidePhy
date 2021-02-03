@@ -15,7 +15,7 @@ nsimin = 10 * 2
 nsimax = 100 * 2
 tend = 20
 dilution_rate = 0.0
-time_step = 1 / (24*60)
+time_step = 1 / 24
 volume = 1.0
 
 twospp = SBMi(ini_resource=ini_resource, ini_density=ini_density, min_size=minsize, max_size=maxsize, spp_names=spp_names,

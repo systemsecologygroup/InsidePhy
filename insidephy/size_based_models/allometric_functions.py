@@ -26,7 +26,7 @@ def q_max(cvol):
     pgNtogN = 1. / 1e12
     gNtomolN = 1. / 14.007
     molNtoumolN = 1e6 / 1.
-    #return (10 ** (-1.26 + np.log10(cvol) * 0.93)) * pgNtogN * gNtomolN  # * molNtoumolN  # pgN/cell -> umolN/cell
+    # return (10 ** (-1.26 + np.log10(cvol) * 0.93)) * pgNtogN * gNtomolN  # * molNtoumolN  # pgN/cell -> umolN/cell
     return (10**(-1.26) * cvol**0.93) * pgNtogN * gNtomolN  # * molNtoumolN  # pgN/cell -> umolN/cell
 
 
