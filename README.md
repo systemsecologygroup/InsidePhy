@@ -23,7 +23,7 @@ those using the individual-based model type.
  environment-mediated trade-off emerges from the combination of the 
  selected allometries in conjunction with the prevailing resource conditions.
 
-![Schematic and allometries implemented in *insidephy*](/Users/eat/Documents/Projects/Dynatrait/Manuscripts/insidephy/schematic_allo.png)
+![Schematic and allometries implemented in *insidephy*](/Users/acevedo/Documents/Projects/Dynatrait/Manuscripts/insidephy/schematic_allo.png)
  
 ### Size-based model using size classes (SBMc)
 In the package *insidephy*, the module ``SMBc`` contains a class
@@ -56,7 +56,7 @@ algorithm used here to make sure the number of (super) individuals stays within 
 tractable range. Below there is a flow diagram showing the steps taking during a execution of a single
 time step of the SBMi model. 
 
-![Flow diagram of all processes executed during a single time step of SMBi model](/Users/eat/Documents/Projects/Dynatrait/Manuscripts/insidephy/SBMi_flowdiagram.png)
+![Flow diagram of all processes executed during a single time step of SMBi model](/Users/acevedo/Documents/Projects/Dynatrait/Manuscripts/insidephy/SBMi_flowdiagram.png)
  
 
 ## Installation details
@@ -94,7 +94,7 @@ nsi_spp = [500, 500]
 nsi_min = 200
 nsi_max = 2000
 time_end = 20
-time_step = 1 / (24*60)
+time_step = 1 / 24
 ```
 Then to execute the simulation simply type:
 ```python

@@ -6,3 +6,4 @@ build/*
 *.png
 *.nc
 /dask-worker-space/*
+/insidephy/examples/dask-worker-space/*
