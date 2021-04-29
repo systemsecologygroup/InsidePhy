@@ -1,7 +1,7 @@
 import numpy as np
 import random
 import time
-import insidephy.size_based_models.allometric_functions as AlloFunc
+import insidephy.size_based_models.allometric_functions as allo
 
 
 class PhytoCell:
@@ -25,17 +25,17 @@ class PhytoCell:
         else:
             self.cell_size = init_cell_size
         if init_biomass is None:
-            self.ini_biomass = AlloFunc.biomass(self.cell_size)  # C biomass pgC/cell -> molC/cell
+            self.ini_biomass = allo.biomass(self.cell_size)  # C biomass pgC/cell -> molC/cell
         else:
             self.ini_biomass = init_biomass  # molC/cell
-        self.q_max = AlloFunc.q_max(
+        self.q_max = allo.q_max(
             self.cell_size) / self.ini_biomass  # Max Quota pgN/cell -> molN/molC
-        self.q_min = AlloFunc.q_min(
+        self.q_min = allo.q_min(
             self.cell_size) / self.ini_biomass  # Min Quota pgN/cell -> molN/molC
-        self.v_max = AlloFunc.v_max(
+        self.v_max = allo.v_max(
             self.cell_size) / self.ini_biomass  # Max uptake velocity pgN/cell*day -> molN/molC*day
-        self.mu_max = AlloFunc.mu_max(self.cell_size)  # Maximum growth rate 1/day
-        self.kr = AlloFunc.k_r(self.cell_size)  # resource half-saturation molN/L = MN
+        self.mu_max = allo.mu_max(self.cell_size)  # Maximum growth rate 1/day
+        self.kr = allo.k_r(self.cell_size)  # resource half-saturation molN/L = MN
         if init_quota is None:
             self.quota = (self.q_min + self.q_max) / 2.  # Cell Quota (molN/molC)
         else:
@@ -63,7 +63,7 @@ class PhytoCell:
         self.biomass += (self.mu * self.biomass) * tstep
         #             = (1/day * molC/cell) * day
         #             = molC/cell
-        self.cell_size = AlloFunc.biomass_to_size(self.biomass)
+        self.cell_size = allo.biomass_to_size(self.biomass)
 
 
 class SBMi:
@@ -74,11 +74,12 @@ class SBMi:
 
     def __init__(self, ini_resource, ini_density, spp_names, min_size, max_size,
                  nsi_spp, nsi_min, nsi_max, dilution_rate,
-                 volume, time_end=20, time_step=1/24, print_time_step=1,
+                 volume, time_end=20, time_step=1 / 24, print_time_step=1,
                  timeit=False):
-        if not all([isinstance(lst, list) for lst in iter([spp_names, ini_density, min_size, max_size, nsi_spp])]):
+        if not all([isinstance(item, list) or isinstance(item, tuple)
+                    for item in iter([spp_names, ini_density, min_size, max_size, nsi_spp])]):
             raise TypeError('Error on input parameters spp_names, ini_density, min_size, max_size or nsi_spp. '
-                            'They must be type list.')
+                            'Input parameters must be type list or tuple.')
         if not all([len(lst) == len(spp_names) for lst in iter([spp_names, ini_density, min_size, max_size, nsi_spp])]):
             raise ValueError("initial values of spp_names, ini_density, min_size, max_size and nsi_spp "
                              "must be lists of the same length depending on the number of species use "
@@ -95,7 +96,7 @@ class SBMi:
         self.nsi_min = nsi_min  # Minimum number of super individuals per species
         self.nsi_max = nsi_max  # Maximum number of super individuals per species
         self.nsi_ave = (nsi_min + nsi_max) // 2  # Average number of super individuals
-        self.nsi_spp = nsi_spp  # Number of super individuals per species
+        self.nsi_spp = list(nsi_spp)  # Number of super individuals per species
         self.dt = time_step  # time step of simulation fraction of day
         self.dtp = print_time_step  # time step to print
         self.time = np.linspace(0, time_end, int((time_end + self.dtp) / self.dtp))
@@ -114,6 +115,7 @@ class SBMi:
         self.agents_biomass = np.zeros((len(self.spp_names), len(self.time), nsi_max))
         self.agents_abundance = np.zeros((len(self.spp_names), len(self.time), nsi_max))
         self.agents_growth = np.zeros((len(self.spp_names), len(self.time), nsi_max))
+        self.agents_quota = np.zeros((len(self.spp_names), len(self.time), nsi_max))
         self.agents_size[:] = np.nan
         self.agents_biomass[:] = np.nan
         self.agents_abundance[:] = np.nan
@@ -163,6 +165,9 @@ class SBMi:
                     self.agents_abundance[i, t_print, k] = self.pdic[key].rep_nind
                     # Growth rate
                     self.agents_growth[i, t_print, k] = self.pdic[key].mu
+                    # Quota
+                    self.agents_quota[i, t_print, k] = self.pdic[key].quota * self.pdic[key].biomass * \
+                                                       self.pdic[key].rep_nind
 
     def split_combine(self):
         """

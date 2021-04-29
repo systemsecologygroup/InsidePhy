@@ -1,7 +1,7 @@
 import numpy as np
 import time
 from scipy.integrate import odeint
-import insidephy.size_based_models.allometric_functions as AlloFunc
+import insidephy.size_based_models.allometric_functions as allo
 
 
 class SBMc:
@@ -13,9 +13,10 @@ class SBMc:
     def __init__(self, ini_resource, ini_density, spp_names, min_size, max_size, num_sc,
                  dilution_rate, volume, time_ini=0, time_end=20, time_steps=100, timeit=False, vectorize=True):
 
-        if not all([isinstance(lst, list) for lst in iter([spp_names, ini_density, min_size, max_size, num_sc])]):
+        if not all([isinstance(item, list) or isinstance(item, tuple)
+                    for item in iter([spp_names, ini_density, min_size, max_size, num_sc])]):
             raise TypeError('Error on input parameters spp_names, ini_density, min_size, max_size or num_sc. '
-                            'They must be type list.')
+                            'Input parameters must be type list or tuple.')
         if not all([len(lst) == len(spp_names) for lst in iter([spp_names, ini_density, min_size, max_size, num_sc])]):
             raise ValueError("initial values of spp_names, ini_density, min_size, max_size and num_sc "
                              "must be lists of the same length depending on the number of species use "
@@ -33,8 +34,8 @@ class SBMc:
         self.volume = volume
         self.size_range = np.concatenate(([np.logspace(np.log10(min_size[n]), np.log10(max_size[n]), num_sc[n])
                                            for n, l in enumerate(spp_names)]), 0)
-        self.ini_quota = (AlloFunc.q_max(self.size_range) +
-                          AlloFunc.q_min(self.size_range)) / 2.
+        self.ini_quota = (allo.q_max(self.size_range) +
+                          allo.q_min(self.size_range)) / 2.
         self.y0 = np.concatenate(([self.ini_resource],
                                   self.ini_quota,
                                   self.ini_density,
@@ -44,7 +45,7 @@ class SBMc:
         self.resource = solution[:, 0]
         self.quota = solution[:, 1:sum(num_sc) + 1]
         self.abundance = solution[:, 1 + sum(num_sc): 1 + sum(num_sc) * 2]
-        self.biomass = self.abundance * AlloFunc.biomass(self.size_range)
+        self.biomass = self.abundance * allo.biomass(self.size_range)
         self.mus = solution[1:, 1 + sum(num_sc) * 2:] - solution[0:-1, 1 + sum(num_sc) * 2:]
         self.mus = np.append(self.mus, self.mus[-1, :].reshape(1, sum(num_sc)), 0)
 
@@ -65,11 +66,11 @@ class SBMc:
         drqndt = np.zeros(len(y))  # Array with solution of the system of equations
 
         if self.vectorize:
-            vmaxsc = AlloFunc.v_max(S)  # Maximum uptake rate
-            qminsc = AlloFunc.q_min(S)  # Minimum internal quota
-            qmaxsc = AlloFunc.q_max(S)  # Maximum internal quota
-            mumaxsc = AlloFunc.mu_max(S)  # Maximum growth rate
-            knsc = AlloFunc.k_r(S)  # Resource half-saturation
+            vmaxsc = allo.v_max(S)  # Maximum uptake rate
+            qminsc = allo.q_min(S)  # Minimum internal quota
+            qmaxsc = allo.q_max(S)  # Maximum internal quota
+            mumaxsc = allo.mu_max(S)  # Maximum growth rate
+            knsc = allo.k_r(S)  # Resource half-saturation
             vsc = vmaxsc * ((qmaxsc - Q) / (qmaxsc - qminsc)) * (R / (R + knsc))  # uptake
             muc = mumaxsc * (1. - (qminsc / Q))  # growth
             drqndt[0] = self.dilution_rate * (self.ini_resource - R) - np.sum(vsc * N)  # Resources
@@ -82,11 +83,11 @@ class SBMc:
                 Qsc = Q[sc]  # Internal quota of size class j
                 Nsc = N[sc]  # Cell density of size class j
                 Ssc = S[sc]  # Cell volume of size class j
-                vmaxsc = AlloFunc.v_max(Ssc)  # Maximum uptake rate
-                qminsc = AlloFunc.q_min(Ssc)  # Minimum internal quota
-                qmaxsc = AlloFunc.q_max(Ssc)  # Maximum internal quota
-                mumaxsc = AlloFunc.mu_max(Ssc)  # Maximum growth rate
-                knsc = AlloFunc.k_r(Ssc)  # Resource half-saturation
+                vmaxsc = allo.v_max(Ssc)  # Maximum uptake rate
+                qminsc = allo.q_min(Ssc)  # Minimum internal quota
+                qmaxsc = allo.q_max(Ssc)  # Maximum internal quota
+                mumaxsc = allo.mu_max(Ssc)  # Maximum growth rate
+                knsc = allo.k_r(Ssc)  # Resource half-saturation
                 vsc = vmaxsc * ((qmaxsc - Qsc) / (qmaxsc - qminsc)) * (R / (R + knsc))  # uptake
                 muc = mumaxsc * (1. - (qminsc / Qsc))  # growth
                 drqndt[0] -= vsc * Nsc  # Resources
