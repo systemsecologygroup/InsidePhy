@@ -11,6 +11,7 @@ import matplotlib.lines as mlines
 import seaborn as sns
 from matplotlib.patches import Patch
 import xarray as xr
+import matplotlib.gridspec as gridspec
 
 
 def sim_run(rel_size_range=0.25, ss_mp_names=['Synechococcus_sp', 'Micromonas_pusilla'],
@@ -161,12 +162,13 @@ def save_dataset(out_file_name='SsMp_exp.nc'):
     return ds
 
 
-def plots():
+def temporal_dynamics_plot():
     """
-    method to plot results of competition experiments for two species under three dilution rates
-    :return: two plots
+    method to plot aggregate results of competition experiments for two species under three dilution rates
+    :return: plot
     """
-    ds = xr.load_dataset('SsMp_exp.nc')
+    Ss_Mp_data_path = pkg_resources.resource_filename('insidephy.data', 'SsMp_exp.nc')
+    ds = xr.load_dataset(Ss_Mp_data_path)
 
     fig1, axs1 = plt.subplots(4, 3, sharex='col', sharey='row', figsize=(10, 8))
     # Resources plots
@@ -224,6 +226,56 @@ def plots():
     axs1[0, 0].legend([blackline, greyline], ['SBMc', 'SBMi'], loc='upper right')
     fig1.savefig('Ss_Mp_temporal_dynamics.png', dpi=600)
 
+
+def spp_weights_plot():
+    """
+    Method to plot biomass and abundance of the two species competition experiment.
+    :return: plot
+    """
+    Ss_Mp_data_path = pkg_resources.resource_filename('insidephy.data', 'SsMp_exp.nc')
+    ds = xr.load_dataset(Ss_Mp_data_path)
+    cols = ['#5494aeff', '#7cb950ff']
+    fig0, axs0 = plt.subplots(2, 3,  sharex='col', sharey='row', figsize=(8, 6))
+    axs0[0, 0].plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[0, 0, :], c=cols[0], ls='--', lw=3.0)
+    axs0[0, 0].plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[0, 1, :], c=cols[1], ls='--', lw=3.0)
+    axs0[0, 1].plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[1, 0, :], c=cols[0], ls='--', lw=3.0)
+    axs0[0, 1].plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[1, 1, :], c=cols[1], ls='--', lw=3.0)
+    axs0[0, 2].plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[2, 0, :], c=cols[0], ls='--', lw=3.0)
+    axs0[0, 2].plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[2, 1, :], c=cols[1], ls='--', lw=3.0)
+
+    axs0[1, 0].plot(ds.time_sbmi, ds.sbmi_agents_biomass.sum(axis=3)[0, 0, :], c=cols[0], ls='--', lw=3.0)
+    axs0[1, 0].plot(ds.time_sbmi, ds.sbmi_agents_biomass.sum(axis=3)[0, 1, :], c=cols[1], ls='--', lw=3.0)
+    axs0[1, 1].plot(ds.time_sbmi, ds.sbmi_agents_biomass.sum(axis=3)[1, 0, :], c=cols[0], ls='--', lw=3.0)
+    axs0[1, 1].plot(ds.time_sbmi, ds.sbmi_agents_biomass.sum(axis=3)[1, 1, :], c=cols[1], ls='--', lw=3.0)
+    axs0[1, 2].plot(ds.time_sbmi, ds.sbmi_agents_biomass.sum(axis=3)[2, 0, :], c=cols[0], ls='--', lw=3.0)
+    axs0[1, 2].plot(ds.time_sbmi, ds.sbmi_agents_biomass.sum(axis=3)[2, 1, :], c=cols[1], ls='--', lw=3.0)
+
+    axs0[1, 0].set_yscale('log')
+    axs0[0, 0].set_yscale('log')
+    axs0[0, 0].set_title('0% dilution rate', weight='bold')
+    axs0[0, 1].set_title('25% dilution rate', weight='bold')
+    axs0[0, 2].set_title('50% dilution rate', weight='bold')
+    axs0[0, 0].set_ylabel('Abundance\n[cells L$^{-1}$]', weight='bold')
+    axs0[1, 0].set_ylabel('Biomass\n[mM C]', weight='bold')
+    axs0[1, 0].set_xlabel('Time [days]', weight='bold')
+    axs0[1, 1].set_xlabel('Time [days]', weight='bold')
+    axs0[1, 2].set_xlabel('Time [days]', weight='bold')
+    Ssline = mlines.Line2D([], [], c=cols[0], ls='--', lw=3.0)
+    Mpline = mlines.Line2D([], [], c=cols[1], ls='--', lw=3.0)
+    axs0[0, 0].legend([Ssline, Mpline], ['Ss', 'Mp'], loc='lower right')
+    fig0.subplots_adjust(wspace=0.1, hspace=0.1)
+    fig0.savefig('Ss_Mp_weights.png', dpi=600)
+
+
+def distribution_plot():
+    """
+    Species size distributions at specific time steps from the two species competition experiment.
+    :return: plot
+    """
+
+    Ss_Mp_data_path = pkg_resources.resource_filename('insidephy.data', 'SsMp_exp.nc')
+    ds = xr.load_dataset(Ss_Mp_data_path)
+    cols = ['#5494aeff', '#7cb950ff']
     # Reshape of data to plot size distributions of species
     dtf00 = pd.DataFrame({'cellsize': ds.sbmi_agents_size[0].values.flatten(),
                           'abundance': ds.sbmi_agents_abundance[0].values.flatten(),
@@ -252,68 +304,107 @@ def plots():
     dtf50['logcellsize'] = dtf50['cellsize'].transform(np.log10).values
     dtf50['logabundance'] = dtf50['abundance'].transform(np.log10).values
 
-    cols = ['#5494aeff', '#7cb950ff']
+    fig = plt.figure(figsize=(10, 8))
+    gs0 = gridspec.GridSpec(2, 1, hspace=0.20, figure=fig)
+    gs00 = gridspec.GridSpecFromSubplotSpec(2, 3, wspace=0.125, hspace=0.15, subplot_spec=gs0[0])
+    ax1 = fig.add_subplot(gs00[0, 0])
+    ax2 = fig.add_subplot(gs00[0, 1])
+    ax3 = fig.add_subplot(gs00[0, 2])
+    ax4 = fig.add_subplot(gs00[1, 0])
+    ax5 = fig.add_subplot(gs00[1, 1])
+    ax6 = fig.add_subplot(gs00[1, 2])
+    gs01 = gs0[1].subgridspec(3, 3, wspace=0.125, hspace=0.15)
+    ax7 = fig.add_subplot(gs01[0, 0])
+    ax8 = fig.add_subplot(gs01[0, 1])
+    ax9 = fig.add_subplot(gs01[0, 2])
+    ax10 = fig.add_subplot(gs01[1, 0])
+    ax11 = fig.add_subplot(gs01[1, 1])
+    ax12 = fig.add_subplot(gs01[1, 2])
+    ax13 = fig.add_subplot(gs01[2, 0])
+    ax14 = fig.add_subplot(gs01[2, 1])
+    ax15 = fig.add_subplot(gs01[2, 2])
 
-    fig2, axs2 = plt.subplots(5, 3, sharex='col', sharey='row', figsize=(10, 8))
+    ax1.plot(ds.time_sbmi, ds.sbmi_resource[0, :] * 1e3, c='black', lw=3.0, clip_on=False)
+    ax2.plot(ds.time_sbmi, ds.sbmi_resource[1, :] * 1e3, c='black', lw=3.0)
+    ax3.plot(ds.time_sbmi, ds.sbmi_resource[2, :] * 1e3, c='black', lw=3.0)
+
+    ax4.plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[0, 0, :], c=cols[0], lw=3.0)
+    ax4.plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[0, 1, :], c=cols[1], lw=3.0)
+    ax5.plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[1, 0, :], c=cols[0], lw=3.0)
+    ax5.plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[1, 1, :], c=cols[1], lw=3.0)
+    ax6.plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[2, 0, :], c=cols[0], lw=3.0)
+    ax6.plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[2, 1, :], c=cols[1], lw=3.0)
+
     sns.kdeplot(data=dtf00[dtf00.time == 0], x='cellsize', weights='abundance', hue='names', palette=cols,
-                legend=False, cut=0, fill=True, multiple='stack', linewidth=0.25, ax=axs2[0, 0], log_scale=True)
-    sns.kdeplot(data=dtf00[dtf00.time == 5], x='cellsize', weights='abundance', hue='names', palette=cols,
-                legend=False, cut=0, fill=True, multiple='stack', linewidth=0.25, ax=axs2[1, 0], log_scale=True)
+                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax7)
     sns.kdeplot(data=dtf00[dtf00.time == 10], x='cellsize', weights='abundance', hue='names', palette=cols,
-                legend=False, cut=0, fill=True, multiple='stack', linewidth=0.25, ax=axs2[2, 0], log_scale=True)
-    sns.kdeplot(data=dtf00[dtf00.time == 15], x='cellsize', weights='abundance', hue='names', palette=cols,
-                legend=False, cut=0, fill=True, multiple='stack', linewidth=0.25, ax=axs2[3, 0], log_scale=True)
+                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax10)
     sns.kdeplot(data=dtf00[dtf00.time == 20], x='cellsize', weights='abundance', hue='names', palette=cols,
-                legend=False, cut=0, fill=True, multiple='stack', linewidth=0.25, ax=axs2[4, 0], log_scale=True)
+                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax13)
 
     sns.kdeplot(data=dtf25[dtf25.time == 0], x='cellsize', weights='abundance', hue='names', palette=cols,
-                legend=False, cut=0, fill=True, multiple='stack', linewidth=0.25, ax=axs2[0, 1], log_scale=True)
-    sns.kdeplot(data=dtf25[dtf25.time == 5], x='cellsize', weights='abundance', hue='names', palette=cols,
-                legend=False, cut=0, fill=True, multiple='stack', linewidth=0.25, ax=axs2[1, 1], log_scale=True)
+                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax8)
     sns.kdeplot(data=dtf25[dtf25.time == 10], x='cellsize', weights='abundance', hue='names', palette=cols,
-                legend=False, cut=0, fill=True, multiple='stack', linewidth=0.25, ax=axs2[2, 1], log_scale=True)
-    sns.kdeplot(data=dtf25[dtf25.time == 15], x='cellsize', weights='abundance', hue='names', palette=cols,
-                legend=False, cut=0, fill=True, multiple='stack', linewidth=0.25, ax=axs2[3, 1], log_scale=True)
+                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax11,)
     sns.kdeplot(data=dtf25[dtf25.time == 20], x='cellsize', weights='abundance', hue='names', palette=cols,
-                legend=False, cut=0, fill=True, multiple='stack', linewidth=0.25, ax=axs2[4, 1], log_scale=True)
+                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax14)
 
     sns.kdeplot(data=dtf50[dtf50.time == 0], x='cellsize', weights='abundance', hue='names', palette=cols,
-                legend=False, cut=0, fill=True, multiple='stack', linewidth=0.25, ax=axs2[0, 2], log_scale=True)
-    sns.kdeplot(data=dtf50[dtf50.time == 5], x='cellsize', weights='abundance', hue='names', palette=cols,
-                legend=False, cut=0, fill=True, multiple='stack', linewidth=0.25, ax=axs2[1, 2], log_scale=True)
+                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax9)
     sns.kdeplot(data=dtf50[dtf50.time == 10], x='cellsize', weights='abundance', hue='names', palette=cols,
-                legend=False, cut=0, fill=True, multiple='stack', linewidth=0.25, ax=axs2[2, 2], log_scale=True)
-    sns.kdeplot(data=dtf50[dtf50.time == 15], x='cellsize', weights='abundance', hue='names', palette=cols,
-                legend=False, cut=0, fill=True, multiple='stack', linewidth=0.25, ax=axs2[3, 2], log_scale=True)
+                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax12)
     sns.kdeplot(data=dtf50[dtf50.time == 20], x='cellsize', weights='abundance', hue='names', palette=cols,
-                legend=False, cut=0, fill=True, multiple='stack', linewidth=0.25, ax=axs2[4, 2], log_scale=True)
+                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax15)
 
-    axs2[0, 0].set_xlim(1e-1, 1e2)
-    axs2[0, 1].set_xlim(1e-1, 1e2)
-    axs2[0, 2].set_xlim(1e-1, 1e2)
-    axs2[0, 0].set_ylim(0, 6)
-    axs2[1, 0].set_ylim(0, 6)
-    axs2[2, 0].set_ylim(0, 6)
-    axs2[3, 0].set_ylim(0, 6)
-    axs2[4, 0].set_ylim(0, 6)
-    axs2[0, 0].set_ylabel('Density', size=12, fontweight="bold")
-    axs2[1, 0].set_ylabel('Density', size=12, fontweight="bold")
-    axs2[2, 0].set_ylabel('Density', size=12, fontweight="bold")
-    axs2[3, 0].set_ylabel('Density', size=12, fontweight="bold")
-    axs2[4, 0].set_ylabel('Density', size=12, fontweight="bold")
-    axs2[4, 0].set_xlabel('Cell size [$\mu$m$^{3}$]', size=12, fontweight="bold")
-    axs2[4, 1].set_xlabel('Cell size [$\mu$m$^{3}$]', size=12, fontweight="bold")
-    axs2[4, 2].set_xlabel('Cell size [$\mu$m$^{3}$]', size=12, fontweight="bold")
-    fig2.text(0.90, 0.79, 't=0', size=12, fontweight="bold", rotation=270)
-    fig2.text(0.90, 0.635, 't=5', size=12, fontweight="bold", rotation=270)
-    fig2.text(0.90, 0.465, 't=10', size=12, fontweight="bold", rotation=270)
-    fig2.text(0.90, 0.305, 't=15', size=12, fontweight="bold", rotation=270)
-    fig2.text(0.90, 0.145, 't=20', size=12, fontweight="bold", rotation=270)
-    axs2[0, 0].set_title('0% dilution rate', weight='bold')
-    axs2[0, 1].set_title('25% dilution rate', weight='bold')
-    axs2[0, 2].set_title('50% dilution rate', weight='bold')
+    for ax in [ax1, ax2, ax3]:
+        ax.set_xlim(0, 20)
+        ax.set_ylim(0, 0.20)
+        ax.tick_params(labelbottom=False, labelleft=False)
+
+    for ax in [ax4, ax5, ax6]:
+        ax.set_yscale('log')
+        ax.set_ylim(1e6, 1e12)
+        ax.set_xlim(0, 20)
+        ax.set_yticks([1e6, 1e8, 1e10, 1e12])
+        ax.tick_params(labelleft=False)
+        ax.set_xlabel('Time [days]', size=11, fontweight="bold")
+        ax.set_xticklabels([r'$\bf{0}$', 5, r'$\bf{10}$', 15, r'$\bf{20}$'])
+
+    for ax in fig.axes[6:]:
+        ax.set_xscale('log')
+        ax.set_xlim(1e-1, 1e2)
+        ax.tick_params(labelbottom=False, labelleft=False)
+        ax.set_ylabel('')
+        ax.set_xlabel('')
+
+    for ax in [ax7, ax10, ax13]:
+        ax.set_ylabel('Density', size=11, fontweight="bold")
+        ax.tick_params(labelleft=True)
+
+    for ax in fig.axes[6:9]:
+        ax.set_ylim(0, 2.5)
+
+    for ax in fig.axes[9:12]:
+        ax.set_ylim(0, 1.2)
+
+    for ax in fig.axes[12:]:
+        ax.set_xlabel('Cell size [$\mu$m$^{3}$]', size=11, fontweight="bold")
+        ax.tick_params(labelbottom=True)
+        ax.set_ylim(0, 0.4)
+
+    ax1.tick_params(labelleft=True)
+    ax4.tick_params(labelleft=True)
+    ax1.set_title('0% dilution rate', size=12, weight='bold')
+    ax2.set_title('25% dilution rate', size=12, weight='bold')
+    ax3.set_title('50% dilution rate', size=12, weight='bold')
+    ax1.set_ylabel('Nutrients\n[mM N]', size=11, weight='bold')
+    ax4.set_ylabel('Abundance\n[cells L$^{-1}$]', size=11, weight='bold')
+    fig.text(0.90, 0.380, 't=0', size=12, fontweight="bold", rotation=270)
+    fig.text(0.90, 0.260, 't=10', size=12, fontweight="bold", rotation=270)
+    fig.text(0.90, 0.130, 't=20', size=12, fontweight="bold", rotation=270)
+
     legend_elements_ax1 = [Patch(facecolor=cols[0], edgecolor='black', label='Ss'),
                            Patch(facecolor=cols[1], edgecolor='black', label='Mp')]
-    axs2[0, 0].legend(handles=legend_elements_ax1, ncol=2, bbox_to_anchor=(0, 1, 1, 0), loc='upper left')
-    fig2.subplots_adjust(wspace=0.12)
-    fig2.savefig('Ss_Mp_size_distribution.png', dpi=600)
+    ax6.legend(handles=legend_elements_ax1, ncol=2, bbox_to_anchor=(0, 1, 1, 0), loc='upper right')
+    fig.savefig('Ss_Mp_size_distribution.png', dpi=600)
+
