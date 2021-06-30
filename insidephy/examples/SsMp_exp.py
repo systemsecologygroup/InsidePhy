@@ -31,7 +31,7 @@ def sim_run(rel_size_range=0.25, ss_mp_names=['Synechococcus_sp', 'Micromonas_pu
     :param tend: Total simulation time in days
     :param dilution_rate: List with three dilution rates
     :param time_step: time steps use in SBMi model type
-    :param volume: volume of flask where species competeß
+    :param volume: volume of flask where species compete
     :return: tuple with two list containing the results for the SBMc and the SBMi model type
     """
 

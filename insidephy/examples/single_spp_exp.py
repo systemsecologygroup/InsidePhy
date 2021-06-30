@@ -127,6 +127,3 @@ def run_exp(rel_size_range, dilution, volume, max_time,
         out_xr.to_netcdf(out_filename)
     print('Completed single species experiments for %.2f dilution rate simulations. '
           'Total computation time %.2f minutes' % (dilution, (time.time() - start_comp_time) / 60.))
-
-
-# run_exp(0.0, 0.0, 1.0, 20, [1], [50]*1, 10*1, 100*1, 1/2)

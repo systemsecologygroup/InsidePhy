@@ -255,59 +255,6 @@ def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
 
         del init_d, init_r, init_min_size, init_max_size, sp_short_names
 
-        # ds_exp = dask.delayed(xr.Dataset)(data_vars={
-        #     'sbmi_agents_size': (
-        #         ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi.agents_size[np.newaxis, ...]),
-        #     'sbmi_agents_biomass': (
-        #         ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi.agents_biomass[np.newaxis, ...]),
-        #     'sbmi_agents_abundance': (
-        #         ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi.agents_abundance[np.newaxis, ...]),
-        #     'sbmi_agents_growth': (
-        #         ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'], sbmi.agents_growth[np.newaxis, ...]),
-        #     'sbmi_resource': (['exp_num', 'time_sbmi'], sbmi.resource[np.newaxis, ...]),
-        #     'sbmi_tot_abundance': (['exp_num', 'time_sbmi'], sbmi.abundance[np.newaxis, ...]),
-        #     'sbmi_tot_biomass': (['exp_num', 'time_sbmi'], sbmi.biomass[np.newaxis, ...]),
-        #     'sbmi_tot_quota': (['exp_num', 'time_sbmi'], sbmi.quota[np.newaxis, ...]),
-        #     'sbmi_massbalance': (['exp_num', 'time_sbmi'], sbmi.massbalance[np.newaxis, ...]),
-        #     'sbmc_size': (['exp_num', 'idx_num_sc'], sbmc.size_range[np.newaxis, ...]),
-        #     'sbmc_biomass': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc.biomass[np.newaxis, ...]),
-        #     'sbmc_abundance': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc.abundance[np.newaxis, ...]),
-        #     'sbmc_quota': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc.quota[np.newaxis, ...]),
-        #     'sbmc_growth': (['exp_num', 'time_sbmc', 'idx_num_sc'], sbmc.mus[np.newaxis, ...]),
-        #     'sbmc_resource': (['exp_num', 'time_sbmc'], sbmc.resource[np.newaxis, ...])
-        # },
-        #     coords={
-        #         'exp_num': [exp],
-        #         'spp_num': np.arange(num_spp_exp),
-        #         'spp_name_short': (['exp_num', 'spp_num'], out_sp_short_names),
-        #         'spp_name_long': (['exp_num', 'spp_num'], out_sp_long_names),
-        #         'time_sbmi': sbmi.time,
-        #         'time_sbmc': sbmc.time,
-        #         'num_agents': np.arange(sbmi_nsimax + (sbmi_nsimin * num_spp_exp)),
-        #         'idx_num_sc': np.arange(sum(sbmc_numsc * num_spp_exp))
-        #     },
-        #     attrs={'title': 'Multiple species experiments',
-        #            'description': 'Experiments for a combination of ' + str(num_spp_exp) +
-        #                           ' species and by using two size-based model types. '
-        #                           'One model type based on individuals (SBMi) '
-        #                           'and another type based on size classes (SBMc)',
-        #            'simulations setup': 'relative size range:' + str(rel_size_range) +
-        #                                 ', dilution rate:' + str(dilution) +
-        #                                 ', volume:' + str(volume) +
-        #                                 ', maximum time of simulations:' + str(max_time) +
-        #                                 ', initial number of size classes:' + str(sbmc_numsc) +
-        #                                 ', initial number of (super) individuals:' + str(sbmi_nsispp) +
-        #                                 ', minimum number of (super) individuals:' + str(sbmi_nsimin) +
-        #                                 ', maximum number of (super) individuals:' + str(sbmi_nsimax) +
-        #                                 ', time step for individual-based model simulations:' + str(sbmi_ts),
-        #            'time_units': 'd (days)',
-        #            'size_units': 'um^3 (cubic micrometers)',
-        #            'biomass_units': 'mol C / cell (mol of carbon per cell)',
-        #            'abundance_units': 'cell / L (cells per litre)',
-        #            'quota_units': 'mol N / mol C * cell (mol of nitrogen per mol of carbon per cell)',
-        #            'growth_units': '1 / day (per day)',
-        #            'resource_units': 'uM N (micro Molar of nitrogen)'
-        #            })
         if sbmi_variant and sbmc_variant:
             ds_exp = dask.delayed(create_dataset)(exp_num=exp, _short_names=out_sp_short_names,
                                                   _long_names=out_sp_long_names, _sbmi=sbmi, _sbmc=sbmc)
@@ -334,7 +281,6 @@ def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
         dask.compute(*batch)
 
     print('Total computation time %.2f minutes' % ((time.time() - start_comp_time) / 60.))
-    # client.close()
 
 
 def run_sims_futures(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0, max_time=20,
@@ -576,18 +522,5 @@ def run_sims_futures(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
         del ds_exp, ds_out, all_spp_comb
 
     print('Total computation time %.2f minutes' % ((time.time() - start_comp_time) / 60.))
-    # client.close()
 
 
-"""
-from insidephy.examples.multiple_spp_exp import run_sims_delayed, run_sims_futures
-
-run_sims_delayed(num_spp_exp=2, max_time=10, sbmi_nsispp=[11],
-        sbmi_nsimin=10, sbmi_nsimax=100, sbmi_ts=1/2)
-
-run_sims_futures(num_spp_exp=2, max_time=10, sbmi_nsispp=[11],
-        sbmi_nsimin=10, sbmi_nsimax=100, sbmi_ts=1/2)
-
-import xarray as xr
-all_ds = xr.open_mfdataset('./Multiple_spp_exp_02spp/*.nc', combine='by_coords', concat_dim='exp_num')
-"""

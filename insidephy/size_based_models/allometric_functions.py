@@ -11,8 +11,7 @@ def v_max(cvol):
     """
     pgNtogN = 1. / 1e12
     gNtomolN = 1. / 14.007
-    molNtoumolN = 1e6 / 1.
-    return (0.024 * cvol**1.10) * pgNtogN * gNtomolN  # * molNtoumolN # pgN/cell*d -> molN/cell*d
+    return (0.024 * cvol ** 1.10) * pgNtogN * gNtomolN  # pgN/cell*d -> molN/cell*d
 
 
 def q_max(cvol):
@@ -25,9 +24,7 @@ def q_max(cvol):
     """
     pgNtogN = 1. / 1e12
     gNtomolN = 1. / 14.007
-    molNtoumolN = 1e6 / 1.
-    # return (10 ** (-1.26 + np.log10(cvol) * 0.93)) * pgNtogN * gNtomolN  # * molNtoumolN  # pgN/cell -> umolN/cell
-    return (10**(-1.26) * cvol**0.93) * pgNtogN * gNtomolN  # * molNtoumolN  # pgN/cell -> umolN/cell
+    return (10 ** (-1.26) * cvol ** 0.93) * pgNtogN * gNtomolN  # pgN/cell -> molN/cell
 
 
 def q_min(cvol):
@@ -40,8 +37,7 @@ def q_min(cvol):
     """
     pgNtogN = 1. / 1e12
     gNtomolN = 1. / 14.007
-    molNtoumolN = 1e6 / 1.
-    return (0.032 * cvol**0.76) * pgNtogN * gNtomolN  # * molNtoumolN  # pgN/cell -> mumolN/cell
+    return (0.032 * cvol ** 0.76) * pgNtogN * gNtomolN  # pgN/cell -> molN/cell
 
 
 def mu_inf(cvol):
@@ -51,7 +47,7 @@ def mu_inf(cvol):
     :param cvol: cell volume
     :return: growth rate at infinite cell quota
     """
-    return 4.7 * cvol**-0.26  # 1/d
+    return 4.7 * cvol ** -0.26  # 1/d
 
 
 def mu_max(cvol):
@@ -76,7 +72,7 @@ def k_r(cvol):
     :return: Nitrogen half-saturation constant
     """
     umoltomol = 1. / 1e6
-    return (10**(-0.84) * cvol**0.33) * umoltomol  # mumol N/L -> molN/L
+    return (10 ** (-0.84) * cvol ** 0.33) * umoltomol  # mumol N/L -> molN/L
 
 
 def biomass(cvol):
@@ -89,8 +85,7 @@ def biomass(cvol):
     """
     pgCtogC = 1. / 1e12
     gCtomolC = 1. / 12.0107
-    # return (10 ** (-0.69 + np.log10(cvol) * 0.88)) * pgCtogC * gCtomolC  # pgC/cell -> pmolC/cell
-    return (10**(-0.69) * cvol**0.88) * pgCtogC * gCtomolC  # pgC/cell -> pmolC/cell
+    return (10 ** (-0.69) * cvol ** 0.88) * pgCtogC * gCtomolC  # pgC/cell -> pmolC/cell
 
 
 def biomass_to_size(biomass):

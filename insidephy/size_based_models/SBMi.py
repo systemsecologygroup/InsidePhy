@@ -282,17 +282,6 @@ class SBMi:
                 self.pdic.pop(randkey)
                 self.nsi_spp[spp_idx] -= 1
 
-        # Update dictionary of dead and alive phytoplankton agents
-        # self.pdic = {}
-        # for spp in self.spp_names:
-        #     len_spp_nsi = len([key for key in palive.keys() if spp in key])
-        #     self.pdic.update({spp + str(nag).zfill(5): palive[kk] for nag, kk in
-        #                       zip(range(len_spp_nsi), palive.keys())})
-        # numpdead = len(self.ddic)
-        # self.ddic.update({kk[0:3] + str(numpdead + nag).zfill(5): pdead[kk] for nag, kk in
-        #                   zip(range(len(pdead)), pdead.keys())})
-
-        # resampling of super individuals
         self.split_combine()
 
     def run(self):
