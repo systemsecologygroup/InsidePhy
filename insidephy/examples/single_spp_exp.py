@@ -9,19 +9,32 @@ import time
 from datetime import datetime
 import pkg_resources
 import dask.array as da
+from dask.diagnostics import ProgressBar
 
 dask.config.set(scheduler='processes')
 
 
 def simulations(rel_size_range, dilution, volume, sbmc_numsc, max_time, sbmi_nsispp,
-                sbmi_nsimin, sbmi_nsimax, sbmi_ts):
+                sbmi_nsimin, sbmi_nsimax, sbmi_ts, init_size=('mean', 'min')):
     data_path = pkg_resources.resource_filename('insidephy.data', 'maranon_2013EcoLet_data.h5')
     allometries = pd.read_hdf(data_path, 'allodtf')
     cultures = pd.read_hdf(data_path, 'batchdtf')
+    cellsize = pd.read_hdf(data_path, 'sizedtf')
+
     spp_list = list(cultures.groupby('Species').groups.keys())
     spp_resource = cultures.groupby('Species').first().NO3_uM
     spp_abundance = cultures.groupby('Species').first().Abun_cellmL * 1e3 / 1.
-    spp_size = allometries.groupby('Species').first().Vcell
+    if init_size == 'mean':
+        spp_size = allometries.groupby('Species').first().Vcell
+    elif init_size == 'min':
+        spp_size = cellsize.groupby('Species').min().Vcell
+    elif isinstance(init_size, tuple):
+        raise TypeError('Error on input parameter init_size, please specify the initial size'
+                        ' as mean or min.')
+    else:
+        raise TypeError('Error on input parameter init_size, please specify the initial size'
+                        ' as mean or min.')
+
     init_min_size = [spp_size[sp] - (spp_size[sp] * rel_size_range) for sp in spp_list]
     init_max_size = [spp_size[sp] + (spp_size[sp] * rel_size_range) for sp in spp_list]
     sp_short_names = [sp[0] + sp[search('_', sp).span()[1]] for sp in spp_list]
@@ -57,19 +70,26 @@ def simulations(rel_size_range, dilution, volume, sbmc_numsc, max_time, sbmi_nsi
                                   timeit=False
                                   )
         sbmi_out.append(sbmi)
-    return dask.compute(sbmc_out, sbmi_out), sp_short_names
+
+    with ProgressBar(), dask.config.set(scheduler='processes'):
+        results = dask.compute(sbmc_out, sbmi_out)
+    return results, sp_short_names
 
 
 def run_exp(rel_size_range, dilution, volume, max_time,
-            sbmc_numsc, sbmi_nsispp, sbmi_nsimin, sbmi_nsimax, sbmi_ts):
+            sbmc_numsc, sbmi_nsispp, sbmi_nsimin, sbmi_nsimax, sbmi_ts,
+            fname_base='Single_spp_exp_relsizerange_',
+            init_size=('mean', 'min')):
     start_comp_time = time.time()
     start_datetime = datetime.now()
-    out_filename = 'Single_spp_exp_relsizerange_' + str(rel_size_range).zfill(2) + '.nc'
+    out_filename = fname_base + str(rel_size_range).zfill(2) + '.nc'
 
+    print('Compute single species experiments for %.2f dilution rate simulations.' % dilution)
     (sbmc_exp, sbmi_exp), spp_names = simulations(rel_size_range=rel_size_range,
                                                   dilution=dilution, volume=volume, max_time=max_time,
                                                   sbmc_numsc=sbmc_numsc, sbmi_nsispp=sbmi_nsispp,
-                                                  sbmi_nsimin=sbmi_nsimin, sbmi_nsimax=sbmi_nsimax, sbmi_ts=sbmi_ts)
+                                                  sbmi_nsimin=sbmi_nsimin, sbmi_nsimax=sbmi_nsimax, sbmi_ts=sbmi_ts,
+                                                  init_size=init_size)
     agents_arr_shape = (len(sbmi_exp[0].time), sbmi_nsimax)
     out_xr = xr.Dataset(data_vars={
         'sbmi_agents_size': (['spp_num', 'time_sbmi', 'num_agents'],
@@ -123,7 +143,7 @@ def run_exp(rel_size_range, dilution, volume, max_time,
     out_xr.attrs['resource_units'] = 'uM N (micro Molar of nitrogen)'
     out_xr.attrs['start date'] = start_datetime.strftime("%b-%d-%Y %H:%M:%S")
     out_xr.attrs['total running time'] = '%.2f minutes' % ((time.time() - start_comp_time) / 60.)
-    with dask.config.set(scheduler='threads'):
+    print('Save output as ncfile')
+    with ProgressBar(), dask.config.set(scheduler='threads'):
         out_xr.to_netcdf(out_filename)
-    print('Completed single species experiments for %.2f dilution rate simulations. '
-          'Total computation time %.2f minutes' % (dilution, (time.time() - start_comp_time) / 60.))
+    print('Completed! Total computation time %.2f minutes' % ((time.time() - start_comp_time) / 60.))
