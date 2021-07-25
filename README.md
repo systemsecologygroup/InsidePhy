@@ -1,6 +1,6 @@
-# insidephy: Inter- and intraspecific Size Diversity of Phytoplankton
+# insidephy: Inter- and intra-specific Size Diversity of Phytoplankton
 
-*insidephy* is a package for modelling inter- and intraspecific 
+*insidephy* is a package for modelling inter- and intra-specific 
 size variability of phytoplankton. The package is designed to 
 capture the growth dynamics of phytoplankton species under common
 laboratory conditions, for example using batch cultures or chemostats.
@@ -18,57 +18,57 @@ those using the individual-based model type.
  the allometric relationships between cell size and maximum growth rate, 
  maximum uptake rate, maximum resource quota, minimum resource quota
  and nutrient half-saturation. These allometries allow
- phytoplankton cells sizes with different nutrient competitive abilities
- to be favoured as resource conditions changes. Therefore, an 
- environment-mediated trade-off emerges from the combination of the 
- selected allometries in conjunction with the prevailing resource conditions.
+ phytoplankton cell sizes with different nutrient competitive abilities
+ to be favoured as resource conditions change.
 
 ![Schematic and allometries implemented in *insidephy*](/Users/acevedo/Documents/Projects/Dynatrait/Manuscripts/insidephy/schematic_allo.png)
  
 ### Size-based model using size classes (SBMc)
 In the package *insidephy*, the module ``SMBc`` contains a class
 of the same name with a single method to quantify the size-based 
-model resolving size classes. The SBMc model type consist of a system
+model resolving size classes. The SBMc model type consists of a system
 of ordinary differential equations describing Droop's growth dynamics,
 with state variables for the resource, the internal quota of each 
 size class and the abundance or density of individuals on each size class.
-The model is numerically solved using ``scipy.odeint`` library.
+The model is solved numerically using ``scipy.odeint`` library.
 
 ### Size-based model using individuals (SBMi)
-In the package *insidephy*, the module ``SMBi` contains two classes
-one that describes the agent and another with the routines to quantify 
-the size-based model resolving individuals.
+In the package *insidephy*, the module ``SMBi`` contains two classes one 
+that describes the agent and another with the routines to solve numerically
+the individual-based model.
 
-The agent class is named ``PhytoCell``, for which the cell size is randomly
-assigned from a provided range (between a minimum and maximum cell size). 
+The agent class is named ``PhytoCell``, for which the cell size is assigned 
+from a log-scaled size distribution within the provided size range 
+(between a minimum and maximum cell size provided by the user). 
 Using the assigned sizes to each cell, the other eco-physiological traits 
-are determined using allometric relationships. The ``PhytoCell`` agent 
-also has a method to update its growth based on the available resources following 
-Droop's formulation as for SBMc model. 
+are determined using the above mentioned allometric relationships. 
+The ``PhytoCell`` agent also has a method to update its growth based on 
+the available resources following Droop's formulation similarly as for 
+the SBMc model. 
 
 The second class, named ``SBMi``, contains the routines to quantify the size-based model. 
 The model has four main methods, named ``initialize``, ``update``, ``run`` and ``split-combine``.
 The ``initialize`` method creates a given number of phytoplankton cell agents from the class ``PhytoCell`` 
 all agents with a randomly selected size within the specified size range. The ``update`` method
 contains the main rules that dictate how an agent reproduces and dies. The ``run`` method executes 
-the model and saves the result into arrays. Last, the ``split-combine`` method is the resampling 
-algorithm used here to make sure the number of (super) individuals stays within a computationally 
-tractable range. Below there is a flow diagram showing the steps taking during a execution of a single
-time step of the SBMi model. 
+the model and saves the result into arrays (via method ``save_to_array``). Last, the ``split-combine`` method is the 
+algorithm used to make sure the number of (super) individuals stays within a computationally 
+tractable range. Below there is a flow diagram showing the steps taken during the execution of a single
+time step of the SBMi model.
 
 ![Flow diagram of all processes executed during a single time step of SMBi model](/Users/acevedo/Documents/Projects/Dynatrait/Manuscripts/insidephy/SBMi_flowdiagram.png)
  
 
 ## Installation details
 
-To install and utilize *insidephy* package a running distribution 
+To install and utilize the *insidephy* package a running distribution 
 of Python (preferably 3.7 or above) is required. To install 
 *insidephy* simply download the tarball for the latest version of 
 the package from the GitHub repository and install from the source as:
 ```bash
-$ python install insidephy-0.0.1.tar.gz
+python install insidephy-0.0.1.tar.gz
 ```
-##  Basic usage
+##  Basic usage and minimal running example
 
 Once the package has been successfully installed on Python, 
 then specific modules of the *insidephy* package can be imported, 
@@ -96,7 +96,13 @@ Then to execute the simulation simply type:
 ```python
 sbmi = SBMi(ini_resource=ini_resource, ini_density=ini_density, minsize=min_size, maxsize=max_size, spp_names=spp_names, dilution_rate=dilution_rate, volume=volume, nsi_spp=nsi_spp, nsi_min=nsi_min, nsi_max=nsi_max, time_step=time_step, time_end=time_end)
 ```
-The result of the execution will be stored as multidimensional arrays as part of the object twospp. Therefore, the results of the simulation can be accessed as instances of that object using the dot operator, like:
+The result of the execution will be stored as multidimensional 
+arrays in the object sbmi. The aggregate 
+variables with only time dimension are ``resource``, ``biomass``, 
+``abundance`` and ``quota``. The results of the model in dimensions per time
+and agent are ``agents_size``, ``agensts_biomass`` and ``agents_abundance``. 
+These results can be accessed as instances of ``SBMi`` object using 
+the dot operator, like:
 ```python
 sbmi.resource
 sbmi.biomass
@@ -106,9 +112,32 @@ sbmi.agents_size
 sbmi.agents_biomass
 sbmi.agents_abundance
 ```
+Similarly, the ``SBMc`` model using the same parametrization can be calculated and
+compared with the results of ``SBMi`` model. The full code to compute this example is included in the folder examples
+as part of the minimal running example. The results of the comparison between SBMc and SBMi size-based
+models can be found below. In the leftmost column are shown the temporal
+dynamics of the main variables and by aggregating the results of 
+the idealized species ``Aa`` and ``Bb``. The middle and rightmost column
+summarizes the results for each of the idealized species. As can be observed both 
+models captures similarly the temporal dynamics of the variables, with 
+the exception of the mean cell size, which is here calculated as a weighted mean.
 
 
+![Minimal running example](/Users/acevedo/Documents/GitHub/InsidePhy/insidephy/examples/MREG.png)
 
 
+## Other examples
 
+Other cases to calculate and store single and 
+multiple species experiments using parallel computations are also included
+in the same folder. For example, simulations using the 22 species reported by
+Marañón et al. (2013 Eco. Lett.) show an agreement between observations and 
+both size-model types.
 
+![Resource dynamics on single species experiments](/Users/acevedo/Documents/Projects/Dynatrait/Manuscripts/insidephy/SimData/sbm_allspp_Nutrients.png)
+
+![Particulate organic nitrogen dynamics on single species experiments](/Users/acevedo/Documents/Projects/Dynatrait/Manuscripts/insidephy/SimData/sbm_allspp_PON.png)
+
+![Abundance dynamics on single species experiments](/Users/acevedo/Documents/Projects/Dynatrait/Manuscripts/insidephy/SimData/sbm_allspp_Abundance.png)
+
+![Mean cell size dynamics on single species experiments](/Users/acevedo/Documents/Projects/Dynatrait/Manuscripts/insidephy/SimData/sbm_allspp_CellSize.png)

@@ -6,6 +6,7 @@ from re import search
 import numpy as np
 import dask
 from dask.distributed import Client, LocalCluster
+from dask.diagnostics import ProgressBar
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import seaborn as sns
@@ -20,17 +21,21 @@ def sim_run(rel_size_range=0.25, ss_mp_names=['Synechococcus_sp', 'Micromonas_pu
             time_step=1 / 24, volume=1.0
             ):
     """
-    Method to compute competition experiments between two species
+    function to compute competition experiments between two species
     from the pool of species reported by Marañon et al (2013 Eco. Lett.)
     at three dilution rates
-    :param rel_size_range: initial size variability relative to its initial size mean
-    :param ss_mp_names: list with names of species as reported by Marañon et al. (2013 Eco. Lett.)
-    :param nsi_spp: list with initial number of super individuals to use in SBMi model type
+    :param rel_size_range: float
+        initial size variability relative to its initial mean size
+    :param ss_mp_names: list or tuple
+        list with names of species as reported by Marañon et al. (2013 Eco. Lett.)
+    :param nsi_spp: list or tuple
+        list with initial number of super individuals to use in SBMi model type
     :param nsi_min: minimum number of super individuals
     :param nsi_max: maximum number of super individuals
     :param numsc: list with initial number of size classes use in SBMc model type
     :param tend: Total simulation time in days
-    :param dilution_rate: List with three dilution rates
+    :param dilution_rate: list of floats
+        List with three dilution rates
     :param time_step: time steps use in SBMi model type
     :param volume: volume of flask where species compete
     :return: tuple with two list containing the results for the SBMc and the SBMi model type
@@ -66,7 +71,8 @@ def sim_run(rel_size_range=0.25, ss_mp_names=['Synechococcus_sp', 'Micromonas_pu
         sbmc_out.append(sbmc)
         sbmi_out.append(sbmi)
 
-    output = dask.compute(sbmc_out, sbmi_out)
+    with ProgressBar(), dask.config.set(scheduler='processes'):
+        output = dask.compute(sbmc_out, sbmi_out)
     client.close()
     cluster.close()
     return output
@@ -74,7 +80,7 @@ def sim_run(rel_size_range=0.25, ss_mp_names=['Synechococcus_sp', 'Micromonas_pu
 
 def save_dataset(out_file_name='SsMp_exp.nc'):
     """
-    Method to save results of competition experiments for two species under three dilution rates
+    function to save results of competition experiments for two species under three dilution rates
     using xarray and netcdf files
     :param out_file_name: name output netcdf file
     :return: ncfile
@@ -111,7 +117,7 @@ def save_dataset(out_file_name='SsMp_exp.nc'):
                  np.stack((sbmi_D00.massbalance, sbmi_D25.massbalance, sbmi_D50.massbalance))),
             'sbmc_size':
                 (['exp_num', 'idx_num_sc'],
-                 np.stack((sbmc_D00.size_range, sbmc_D25.size_range, sbmc_D50.size_range))),
+                 np.stack((sbmc_D00._size_range, sbmc_D25._size_range, sbmc_D50._size_range))),
             'sbmc_biomass':
                 (['exp_num', 'time_sbmc', 'idx_num_sc'],
                  np.stack((sbmc_D00.biomass, sbmc_D25.biomass, sbmc_D50.biomass))),
@@ -132,7 +138,7 @@ def save_dataset(out_file_name='SsMp_exp.nc'):
                 'exp_name': (['exp_num'], ['D00', 'D25', 'D50']),
                 'spp_num': np.arange(2),
                 'spp_name_short': (['exp_num', 'spp_num'],
-                                   np.stack((sbmc_D00.spp_names, sbmc_D25.spp_names, sbmc_D50.spp_names))),
+                                   np.stack((sbmc_D00._spp_names, sbmc_D25._spp_names, sbmc_D50._spp_names))),
                 'time_sbmi': sbmi_D00.time,
                 'time_sbmc': sbmc_D00.time,
                 'num_agents': np.arange(2000),
@@ -164,7 +170,7 @@ def save_dataset(out_file_name='SsMp_exp.nc'):
 
 def temporal_dynamics_plot():
     """
-    method to plot aggregate results of competition experiments for two species under three dilution rates
+    function to plot aggregate results of competition experiments for two species under three dilution rates
     :return: plot
     """
     Ss_Mp_data_path = pkg_resources.resource_filename('insidephy.data', 'SsMp_exp.nc')

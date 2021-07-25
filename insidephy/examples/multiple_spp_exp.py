@@ -14,10 +14,60 @@ from dask.distributed import Client, LocalCluster, SSHCluster
 from toolz import partition_all
 
 
-def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0, max_time=20,
+def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0, time_end=20,
                      sbmc_numsc=[10], sbmi_nsispp=[101], sbmi_nsimin=100, sbmi_nsimax=1000, sbmi_ts=1 / 24,
                      ssh=False, ssh_username=None, ssh_pw=None, nprocs=4, nthreads=1, mem_lim=2e9,
                      compute_batches=1000, sbmi_variant=True, sbmc_variant=True):
+    """
+    function to calculate multiple species experiments from 22 phytoplankton species data
+    reported in Marañón et al. (2013 Eco. Lett.). Notice that number of simulations
+    and therefore execution time, memory, and hard drive space grows exponentially
+    to a maximum around half the number of species.
+    :param num_spp_exp: integer
+        number of species to combine on each experiment from a minimum of 1 (similar to single species experiments) to
+          a maximum of 22 (a community composed of maximum number of species investigated by Marañón et al.).
+    :param rel_size_range: float
+        initial size variability relative to its initial mean size
+    :param dilution: float
+        rate of medium exchange in the culture system
+    :param volume: float
+        volume of the culture system
+    :param sbmc_numsc: list or tuple of integers
+        number of size classes per species used in SBMc
+    :param time_end: integer
+        final time in days used in the simulations
+    :param sbmi_nsispp: list or tuple of integers
+        number of super individuals per species
+    :param sbmi_nsimin: integer
+        minimum number of super individual for all species
+    :param sbmi_nsimax: integer
+        maximum number of super individual for all species
+    :param sbmi_ts: float
+        time steps used in the simulations
+    :param ssh: bool
+        whether to use ssh to forward diagnostics of cluster
+        see documentation of dask.distributed.SSHCluster
+    :param ssh_username: string
+        user name to connect to cluster via ssh
+        see documentation of dask.distributed.SSHCluster
+    :param ssh_pw:  string
+        password to connect to cluster via ssh
+        see documentation of dask.distributed.SSHCluster
+    :param n_procs: integer
+        number of cpus to compute the simulations
+    :param n_threads:
+        number of threads per cpu to use in the computations
+    :param mem_lim:
+        maximum memory usage per cpu
+    :param compute_batches: integer
+        number of simulations to compute include in a batch for parellel computation
+    :param sbmi_variant: bool
+        whether to calculate a model based on individual SBMi
+    :param sbmc_variant: bool
+        whether to calculate a model based on size classes SBMc
+    :return: ncfiles with restuls of simulations
+    """
+
     start_comp_time = time.time()
     start_datetime = datetime.now()
     print('Start of experiments for combinations of %.i species on' % num_spp_exp,
@@ -77,7 +127,7 @@ def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
                 'sbmi_tot_biomass': (['exp_num', 'time_sbmi'], _sbmi.biomass[np.newaxis, ...]),
                 'sbmi_tot_quota': (['exp_num', 'time_sbmi'], _sbmi.quota[np.newaxis, ...]),
                 'sbmi_massbalance': (['exp_num', 'time_sbmi'], _sbmi.massbalance[np.newaxis, ...]),
-                'sbmc_size': (['exp_num', 'idx_num_sc'], _sbmc.size_range[np.newaxis, ...]),
+                'sbmc_size': (['exp_num', 'idx_num_sc'], _sbmc._size_range[np.newaxis, ...]),
                 'sbmc_biomass': (['exp_num', 'time_sbmc', 'idx_num_sc'], _sbmc.biomass[np.newaxis, ...]),
                 'sbmc_abundance': (['exp_num', 'time_sbmc', 'idx_num_sc'], _sbmc.abundance[np.newaxis, ...]),
                 'sbmc_quota': (['exp_num', 'time_sbmc', 'idx_num_sc'], _sbmc.quota[np.newaxis, ...]),
@@ -102,7 +152,7 @@ def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
                        'simulations setup': 'relative size range:' + str(rel_size_range) +
                                             ', dilution rate:' + str(dilution) +
                                             ', volume:' + str(volume) +
-                                            ', maximum time of simulations:' + str(max_time) +
+                                            ', maximum time of simulations:' + str(time_end) +
                                             ', initial number of size classes:' + str(sbmc_numsc) +
                                             ', initial number of (super) individuals:' + str(sbmi_nsispp) +
                                             ', minimum number of (super) individuals:' + str(sbmi_nsimin) +
@@ -148,7 +198,7 @@ def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
                        'simulations setup': 'relative size range:' + str(rel_size_range) +
                                             ', dilution rate:' + str(dilution) +
                                             ', volume:' + str(volume) +
-                                            ', maximum time of simulations:' + str(max_time) +
+                                            ', maximum time of simulations:' + str(time_end) +
                                             ', initial number of (super) individuals:' + str(sbmi_nsispp) +
                                             ', minimum number of (super) individuals:' + str(sbmi_nsimin) +
                                             ', maximum number of (super) individuals:' + str(sbmi_nsimax) +
@@ -163,7 +213,7 @@ def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
                        })
         elif _sbmc is not None and _sbmi is None:
             ds = xr.Dataset(data_vars={
-                'sbmc_size': (['exp_num', 'idx_num_sc'], _sbmc.size_range[np.newaxis, ...]),
+                'sbmc_size': (['exp_num', 'idx_num_sc'], _sbmc._size_range[np.newaxis, ...]),
                 'sbmc_biomass': (['exp_num', 'time_sbmc', 'idx_num_sc'], _sbmc.biomass[np.newaxis, ...]),
                 'sbmc_abundance': (['exp_num', 'time_sbmc', 'idx_num_sc'], _sbmc.abundance[np.newaxis, ...]),
                 'sbmc_quota': (['exp_num', 'time_sbmc', 'idx_num_sc'], _sbmc.quota[np.newaxis, ...]),
@@ -185,7 +235,7 @@ def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
                        'simulations setup': 'relative size range:' + str(rel_size_range) +
                                             ', dilution rate:' + str(dilution) +
                                             ', volume:' + str(volume) +
-                                            ', maximum time of simulations:' + str(max_time) +
+                                            ', maximum time of simulations:' + str(time_end) +
                                             ', initial number of size classes:' + str(sbmc_numsc),
                        'time_units': 'd (days)',
                        'size_units': 'um^3 (cubic micrometers)',
@@ -233,7 +283,7 @@ def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
                                       dilution_rate=dilution,
                                       volume=volume,
                                       num_sc=sbmc_numsc * num_spp_exp,
-                                      time_end=max_time,
+                                      time_end=time_end,
                                       timeit=False,
                                       vectorize=True
                                       )
@@ -249,7 +299,7 @@ def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
                                       nsi_min=sbmi_nsimin,
                                       nsi_max=sbmi_nsimax + (sbmi_nsimin * num_spp_exp),
                                       time_step=sbmi_ts,
-                                      time_end=max_time,
+                                      time_end=time_end,
                                       timeit=False
                                       )
 
@@ -286,6 +336,11 @@ def run_sims_delayed(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
 def run_sims_futures(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0, max_time=20,
                      sbmc_numsc=[10], sbmc_ts=100, sbmi_nsispp=[101], sbmi_nsimin=100, sbmi_nsimax=1000, sbmi_ts=1 / 24,
                      ssh=False, ssh_username=None, ssh_pw=None, nprocs=4, nthreads=1, mem_lim=2e9):
+    """
+    This is an experimental function similar to the above to calculate multiple
+    species experiments but using dask.futures instead of dask.dealyed.
+    """
+
     start_comp_time = time.time()
     start_datetime = datetime.now()
     print('Start of experiments for combinations of %.i species on' % num_spp_exp,
@@ -333,7 +388,7 @@ def run_sims_futures(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0,
         return list(all_spp_list[exp_num])
 
     def get_sbmc_size(sbmc_obj):
-        return sbmc_obj.size_range[np.newaxis, ...]
+        return sbmc_obj._size_range[np.newaxis, ...]
 
     def get_sbmc_biomass(sbmc_obj):
         return sbmc_obj.biomass[np.newaxis, ...]

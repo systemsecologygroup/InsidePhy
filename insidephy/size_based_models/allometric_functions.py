@@ -85,7 +85,7 @@ def biomass(cvol):
     """
     pgCtogC = 1. / 1e12
     gCtomolC = 1. / 12.0107
-    return (10 ** (-0.69) * cvol ** 0.88) * pgCtogC * gCtomolC  # pgC/cell -> pmolC/cell
+    return (10 ** (-0.69) * cvol ** 0.88) * pgCtogC * gCtomolC  # pgC/cell -> molC/cell
 
 
 def biomass_to_size(biomass):

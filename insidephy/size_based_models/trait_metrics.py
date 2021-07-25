@@ -37,7 +37,7 @@ def cwv(cell_size, weight, axis=1):
 def size_var_comp_sbmi(cell_size, weight):
     """
     Computation of trait variance components for the trait cell size and
-    following de Bello et al. (2011 Methods Ecol. Evol.).
+    following de Bello et al. (2011 Methods Ecol. & Evol.).
     :param cell_size: array_like
         phytoplankton size spectra as obtained from SBMi model
     :param weight: array_like

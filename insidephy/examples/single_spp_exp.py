@@ -10,12 +10,49 @@ from datetime import datetime
 import pkg_resources
 import dask.array as da
 from dask.diagnostics import ProgressBar
+from dask.distributed import Client, LocalCluster
 
-dask.config.set(scheduler='processes')
 
+def simulations(rel_size_range, dilution, volume, sbmc_numsc, time_end, sbmi_nsispp,
+                sbmi_nsimin, sbmi_nsimax, sbmi_ts, init_size=('mean', 'min'),
+                n_procs=2, n_threads=1, mem_lim=2e9):
+    """
+    function to calculate single species experiments from 22 phytoplankton species data
+    reported in Marañón et al. (2013 Eco. Lett.).
+    :param rel_size_range: float
+        initial size variability relative to its initial mean size
+    :param dilution: float
+        rate of medium exchange in the culture system
+    :param volume: float
+        volume of the culture system
+    :param sbmc_numsc: list or tuple of integers
+        number of size classes per species used in SBMc
+    :param time_end: integer
+        final time in days used in the simulations
+    :param sbmi_nsispp: list or tuple of integers
+        number of super individuals per species
+    :param sbmi_nsimin: integer
+        minimum number of super individual for all species
+    :param sbmi_nsimax: integer
+        maximum number of super individual for all species
+    :param sbmi_ts: float
+        time steps used in the simulations
+    :param init_size: string
+        whether to use minimum (min) or mean (mean) cell size to initialize species
+        as reported by Marañón et al. (2013 Eco. Lett.)
+    :param n_procs: integer
+        number of cpus to compute the simulations
+    :param n_threads:
+        number of threads per cpu to use in the computations
+    :param mem_lim:
+        maximum memory usage per cpu
+    :return: tuple of objects with results of the simulations
+            of SBMc and SBMi and species code names
 
-def simulations(rel_size_range, dilution, volume, sbmc_numsc, max_time, sbmi_nsispp,
-                sbmi_nsimin, sbmi_nsimax, sbmi_ts, init_size=('mean', 'min')):
+    """
+    cluster = LocalCluster(n_workers=n_procs, threads_per_worker=n_threads, memory_limit=mem_lim)
+    client = Client(cluster)
+
     data_path = pkg_resources.resource_filename('insidephy.data', 'maranon_2013EcoLet_data.h5')
     allometries = pd.read_hdf(data_path, 'allodtf')
     cultures = pd.read_hdf(data_path, 'batchdtf')
@@ -49,7 +86,7 @@ def simulations(rel_size_range, dilution, volume, sbmc_numsc, max_time, sbmi_nsi
                                   dilution_rate=dilution,
                                   volume=volume,
                                   num_sc=sbmc_numsc,
-                                  time_end=max_time,
+                                  time_end=time_end,
                                   timeit=False,
                                   vectorize=True
                                   )
@@ -66,27 +103,57 @@ def simulations(rel_size_range, dilution, volume, sbmc_numsc, max_time, sbmi_nsi
                                   nsi_min=sbmi_nsimin,
                                   nsi_max=sbmi_nsimax,
                                   time_step=sbmi_ts,
-                                  time_end=max_time,
+                                  time_end=time_end,
                                   timeit=False
                                   )
         sbmi_out.append(sbmi)
 
     with ProgressBar(), dask.config.set(scheduler='processes'):
         results = dask.compute(sbmc_out, sbmi_out)
+    client.close()
+    cluster.close()
     return results, sp_short_names
 
 
-def run_exp(rel_size_range, dilution, volume, max_time,
+def run_exp(rel_size_range, dilution, volume, time_end,
             sbmc_numsc, sbmi_nsispp, sbmi_nsimin, sbmi_nsimax, sbmi_ts,
             fname_base='Single_spp_exp_relsizerange_',
             init_size=('mean', 'min')):
+    """
+    function to run and save the single species simulation experiments.
+    :param rel_size_range: float
+        initial size variability relative to its initial mean size
+    :param dilution: float
+        rate of medium exchange in the culture system
+    :param volume: float
+        volume of the culture system
+    :param sbmc_numsc: list or tuple of integers
+        number of size classes per species used in SBMc
+    :param time_end: integer
+        final time in days used in the simulations
+    :param sbmi_nsispp: list or tuple of integers
+        number of super individuals per species
+    :param sbmi_nsimin: integer
+        minimum number of super individual for all species
+    :param sbmi_nsimax: integer
+        maximum number of super individual for all species
+    :param sbmi_ts: float
+        time steps used in the simulations
+    :param fname_base: string
+        base of the output file name
+    :param init_size: string
+        whether to use minimum (min) or mean (mean) cell size to initialize species
+        as reported by Marañón et al. (2013 Eco. Lett.)
+    :return: ncfile with results of the simulations
+    """
+
     start_comp_time = time.time()
     start_datetime = datetime.now()
     out_filename = fname_base + str(rel_size_range).zfill(2) + '.nc'
 
     print('Compute single species experiments for %.2f dilution rate simulations.' % dilution)
     (sbmc_exp, sbmi_exp), spp_names = simulations(rel_size_range=rel_size_range,
-                                                  dilution=dilution, volume=volume, max_time=max_time,
+                                                  dilution=dilution, volume=volume, max_time=time_end,
                                                   sbmc_numsc=sbmc_numsc, sbmi_nsispp=sbmi_nsispp,
                                                   sbmi_nsimin=sbmi_nsimin, sbmi_nsimax=sbmi_nsimax, sbmi_ts=sbmi_ts,
                                                   init_size=init_size)
@@ -105,7 +172,7 @@ def run_exp(rel_size_range, dilution, volume, max_time,
         'sbmi_tot_biomass': (['spp_num', 'time_sbmi'], da.from_array([exp.biomass for exp in sbmi_exp])),
         'sbmi_tot_quota': (['spp_num', 'time_sbmi'], da.from_array([exp.quota for exp in sbmi_exp])),
         'sbmi_massbalance': (['spp_num', 'time_sbmi'], da.from_array([exp.massbalance for exp in sbmi_exp])),
-        'sbmc_size': (['spp_num', 'num_spp_sc'], da.from_array([exp.size_range for exp in sbmc_exp])),
+        'sbmc_size': (['spp_num', 'num_spp_sc'], da.from_array([exp._size_range for exp in sbmc_exp])),
         'sbmc_biomass': (['spp_num', 'time_sbmc','num_spp_sc'], da.from_array([exp.biomass for exp in sbmc_exp])),
         'sbmc_abundance': (['spp_num', 'time_sbmc', 'num_spp_sc'], da.from_array([exp.abundance for exp in sbmc_exp])),
         'sbmc_quota': (['spp_num', 'time_sbmc', 'num_spp_sc'], da.from_array([exp.quota for exp in sbmc_exp])),
@@ -127,7 +194,7 @@ def run_exp(rel_size_range, dilution, volume, max_time,
     out_xr.attrs['simulations setup'] = 'relative size range:' + str(rel_size_range) + \
                                         ', dilution rate:' + str(dilution) + \
                                         ', volume:' + str(volume) + \
-                                        ', maximum time of simulations:' + str(max_time) + \
+                                        ', maximum time of simulations:' + str(time_end) + \
                                         ', initial number of size classes:' + str(sbmc_numsc) + \
                                         ', initial number of (super) individuals:' + str(sbmi_nsispp) + \
                                         ', minimum number of (super) individuals:' + str(sbmi_nsimin) + \

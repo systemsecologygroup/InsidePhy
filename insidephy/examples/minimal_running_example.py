@@ -6,6 +6,7 @@ from insidephy.size_based_models.trait_metrics import cwm
 import matplotlib.lines as mlines
 import dask
 from dask.distributed import Client, LocalCluster
+from dask.diagnostics import ProgressBar
 
 
 def sim_run(ini_resource=0.0002, ini_density=(1e4, 1e4), min_size=(1.5e1, 1.5e4), max_size=(2.5e1, 2.5e4),
@@ -66,7 +67,9 @@ def sim_run(ini_resource=0.0002, ini_density=(1e4, 1e4), min_size=(1.5e1, 1.5e4)
     sbm_out.append(sbmc)
     sbm_out.append(sbmi)
 
-    output = dask.compute(sbm_out)
+    with ProgressBar(), dask.config.set(scheduler='processes'):
+        output = dask.compute(sbm_out)
+
     client.close()
     cluster.close()
     return output
@@ -85,39 +88,39 @@ def plots():
     axs1[1, 0].plot(sbmc.time, np.sum(sbmc.quota * sbmc.abundance, axis=1) * 1e3,
                     c='black', lw=3.0, alpha=0.9)
     axs1[1, 0].plot(sbmi.time, sbmi.quota * 1e3, c='grey', ls='--', lw=3.0, alpha=0.9)
-    axs1[1, 1].plot(sbmc.time, (sbmc.quota[:, :sbmc.numsc[0]] *
-                                sbmc.abundance[:, :sbmc.numsc[0]]).sum(axis=1) * 1e3,
+    axs1[1, 1].plot(sbmc.time, (sbmc.quota[:, :sbmc._numsc[0]] *
+                                sbmc.abundance[:, :sbmc._numsc[0]]).sum(axis=1) * 1e3,
                     c=cols[0], lw=3.0, alpha=0.9)
     axs1[1, 1].plot(sbmi.time, sbmi.agents_quota.sum(axis=2)[0, :] * 1e3, c=cols[0], ls='--', lw=3.0, alpha=0.5)
-    axs1[1, 2].plot(sbmc.time, (sbmc.quota[:, sbmc.numsc[0]:] *
-                                sbmc.abundance[:, sbmc.numsc[0]:]).sum(axis=1) * 1e3,
+    axs1[1, 2].plot(sbmc.time, (sbmc.quota[:, sbmc._numsc[0]:] *
+                                sbmc.abundance[:, sbmc._numsc[0]:]).sum(axis=1) * 1e3,
                     c=cols[1], lw=3.0, alpha=0.9)
     axs1[1, 2].plot(sbmi.time, sbmi.agents_quota.sum(axis=2)[1, :] * 1e3, c=cols[1], ls='--', lw=3.0, alpha=0.5)
     # Abundance plots
-    axs1[2, 0].plot(sbmc.time, np.sum(sbmc.abundance[:, :sbmc.numsc[0]], axis=1), c='black', lw=3.0, alpha=0.9)
+    axs1[2, 0].plot(sbmc.time, np.sum(sbmc.abundance[:, :sbmc._numsc[0]], axis=1), c='black', lw=3.0, alpha=0.9)
     axs1[2, 0].plot(sbmi.time, sbmi.abundance, c='grey', ls='--', lw=3.0, alpha=0.9)
-    axs1[2, 1].plot(sbmc.time, sbmc.abundance[:, :sbmc.numsc[0]].sum(axis=1), c=cols[0], lw=3.0, alpha=0.9)
+    axs1[2, 1].plot(sbmc.time, sbmc.abundance[:, :sbmc._numsc[0]].sum(axis=1), c=cols[0], lw=3.0, alpha=0.9)
     axs1[2, 1].plot(sbmi.time, sbmi.agents_abundance.sum(axis=2)[0, :], c='black', ls='--', lw=3.0, alpha=0.5)
-    axs1[2, 2].plot(sbmc.time, sbmc.abundance[:, sbmc.numsc[0]:].sum(axis=1), c=cols[1], lw=3.0, alpha=0.9)
+    axs1[2, 2].plot(sbmc.time, sbmc.abundance[:, sbmc._numsc[0]:].sum(axis=1), c=cols[1], lw=3.0, alpha=0.9)
     axs1[2, 2].plot(sbmi.time, sbmi.agents_abundance.sum(axis=2)[1, :], c='black', ls='--', lw=3.0, alpha=0.5)
     # Biomass plots
-    axs1[3, 0].plot(sbmc.time, np.sum(sbmc.biomass[:, :sbmc.numsc[0]], axis=1), c='black', lw=3.0, alpha=0.9)
+    axs1[3, 0].plot(sbmc.time, np.sum(sbmc.biomass[:, :sbmc._numsc[0]], axis=1), c='black', lw=3.0, alpha=0.9)
     axs1[3, 0].plot(sbmi.time, sbmi.biomass, c='grey', ls='--', lw=3.0, alpha=0.9)
-    axs1[3, 1].plot(sbmc.time, sbmc.biomass[:, :sbmc.numsc[0]].sum(axis=1), c=cols[0], lw=3.0, alpha=0.9)
+    axs1[3, 1].plot(sbmc.time, sbmc.biomass[:, :sbmc._numsc[0]].sum(axis=1), c=cols[0], lw=3.0, alpha=0.9)
     axs1[3, 1].plot(sbmi.time, sbmi.agents_biomass.sum(axis=2)[0, :], c='black', ls='--', lw=3.0, alpha=0.5)
-    axs1[3, 2].plot(sbmc.time, sbmc.biomass[:, sbmc.numsc[0]:].sum(axis=1), c=cols[1], lw=3.0, alpha=0.9)
+    axs1[3, 2].plot(sbmc.time, sbmc.biomass[:, sbmc._numsc[0]:].sum(axis=1), c=cols[1], lw=3.0, alpha=0.9)
     axs1[3, 2].plot(sbmi.time, sbmi.agents_biomass.sum(axis=2)[1, :], c='black', ls='--', lw=3.0, alpha=0.5)
     # Mean cell size plots
-    axs1[4, 0].plot(sbmc.time, cwm(np.broadcast_to(sbmc.size_range, (100, 200)), sbmc.abundance),
+    axs1[4, 0].plot(sbmc.time, cwm(np.broadcast_to(sbmc._size_range, (100, 200)), sbmc.abundance),
                     c='black', lw=3.0, alpha=0.9)
     axs1[4, 0].plot(sbmi.time, cwm(sbmi.agents_size.reshape(31, 4000), sbmi.agents_abundance.reshape(31, 4000)),
                     c='grey', ls='--', lw=3.0, alpha=0.9)
-    axs1[4, 1].plot(sbmc.time, cwm(np.broadcast_to(sbmc.size_range[:sbmc.numsc[0]], (100, 100)),
-                                   sbmc.abundance[:, :sbmc.numsc[0]]), c=cols[0], lw=3.0, alpha=0.9)
+    axs1[4, 1].plot(sbmc.time, cwm(np.broadcast_to(sbmc._size_range[:sbmc._numsc[0]], (100, 100)),
+                                   sbmc.abundance[:, :sbmc._numsc[0]]), c=cols[0], lw=3.0, alpha=0.9)
     axs1[4, 1].plot(sbmi.time, cwm(sbmi.agents_size[0, :, :], sbmi.agents_abundance[0, :, :]), c=cols[0],
                     ls='--', lw=3.0, alpha=0.5)
-    axs1[4, 2].plot(sbmc.time, cwm(np.broadcast_to(sbmc.size_range[sbmc.numsc[0]:], (100, 100)),
-                                   sbmc.abundance[:, sbmc.numsc[0]:]), c=cols[1], lw=3.0, alpha=0.9)
+    axs1[4, 2].plot(sbmc.time, cwm(np.broadcast_to(sbmc._size_range[sbmc._numsc[0]:], (100, 100)),
+                                   sbmc.abundance[:, sbmc._numsc[0]:]), c=cols[1], lw=3.0, alpha=0.9)
     axs1[4, 2].plot(sbmi.time, cwm(sbmi.agents_size[1, :, :], sbmi.agents_abundance[1, :, :]), c=cols[1],
                     ls='--', lw=3.0, alpha=0.5)
     # customization

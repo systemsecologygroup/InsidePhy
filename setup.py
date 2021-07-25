@@ -5,10 +5,10 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="insidephy",
-    version="0.0.1b13",
+    version="0.0.1",
     author="Esteban Acevedo-Trejos",
     author_email="esteban.acevedo@leibniz-zmt.de",
-    description="insidephy: A package for modelling inter- and intraspecific size variability of phytoplankton",
+    description="insidephy: A package for modelling inter- and intra-specific size variability of phytoplankton",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/SEGGroup/",
@@ -16,7 +16,7 @@ setuptools.setup(
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
-        "Development Status :: 4 - Beta",
+        "Development Status :: 5 - Stable",
         "Intended Audience :: Education",
         "Intended Audience :: Science/Research",
         "Natural Language :: English",

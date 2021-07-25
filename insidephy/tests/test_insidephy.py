@@ -45,6 +45,18 @@ class UnitTestCases(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             SBMi(0.002, [1e6], ['Aa', 'Bb'], [10], [100], [10], 50, 500, 0.0, 1.0)
 
+    def test_sbmc_value_exception(self):
+        with self.assertRaises(ValueError) as cm:
+            SBMc(0.002, [1e6], ['Aa', 'Bb'], [10], [100], [10], 50, 500, 0.0, 1.0)
+
+    def test_sbmi_type_exception(self):
+        with self.assertRaises(TypeError) as cm:
+            SBMi(0.002, [1e6], ['Aa', 'Bb'], [10], 100, [10], 50, 500, 0.0, 1.0)
+
+    def test_sbmc_type_exception(self):
+        with self.assertRaises(TypeError) as cm:
+            SBMc(0.002, [1e6], ['Aa', 'Bb'], [10], 100, [10], 50, 500, 0.0, 1.0)
+
 
 if __name__ == '__main__':
     unittest.main()
