@@ -21,7 +21,7 @@ those using the individual-based model type.
  phytoplankton cell sizes with different nutrient competitive abilities
  to be favoured as resource conditions change.
 
-![Schematic and allometries implemented in *insidephy*](/Users/acevedo/Documents/Projects/Dynatrait/Manuscripts/insidephy/schematic_allo.png)
+![Schematic and allometries implemented in *insidephy*](./insidephy/examples/schematic_allo.png)
  
 ### Size-based model using size classes (SBMc)
 In the package *insidephy*, the module ``SMBc`` contains a class
@@ -56,7 +56,7 @@ algorithm used to make sure the number of (super) individuals stays within a com
 tractable range. Below there is a flow diagram showing the steps taken during the execution of a single
 time step of the SBMi model.
 
-![Flow diagram of all processes executed during a single time step of SMBi model](/Users/acevedo/Documents/Projects/Dynatrait/Manuscripts/insidephy/SBMi_flowdiagram.png)
+![Flow diagram of all processes executed during a single time step of SMBi model](./insidephy/examples/SBMi_flowdiagram.png)
  
 
 ## Installation details
@@ -123,7 +123,7 @@ models captures similarly the temporal dynamics of the variables, with
 the exception of the mean cell size, which is here calculated as a weighted mean.
 
 
-![Minimal running example](/Users/acevedo/Documents/GitHub/InsidePhy/insidephy/examples/MREG.png)
+![Minimal running example](./insidephy/examples/MREG.png)
 
 
 ## Other examples
@@ -134,10 +134,19 @@ in the same folder. For example, simulations using the 22 species reported by
 Marañón et al. (2013 Eco. Lett.) show an agreement between observations and 
 both size-model types.
 
-![Resource dynamics on single species experiments](/Users/acevedo/Documents/Projects/Dynatrait/Manuscripts/insidephy/SimData/sbm_allspp_Nutrients.png)
+![Resource dynamics on single species experiments](./insidephy/examples/sbm_allspp_Nutrients.png)
 
-![Particulate organic nitrogen dynamics on single species experiments](/Users/acevedo/Documents/Projects/Dynatrait/Manuscripts/insidephy/SimData/sbm_allspp_PON.png)
+![Particulate organic nitrogen dynamics on single species experiments](./insidephy/examples/sbm_allspp_PON.png)
 
-![Abundance dynamics on single species experiments](/Users/acevedo/Documents/Projects/Dynatrait/Manuscripts/insidephy/SimData/sbm_allspp_Abundance.png)
+![Abundance dynamics on single species experiments](./insidephy/examples/sbm_allspp_Abundance.png)
 
-![Mean cell size dynamics on single species experiments](/Users/acevedo/Documents/Projects/Dynatrait/Manuscripts/insidephy/SimData/sbm_allspp_CellSize.png)
+![Mean cell size dynamics on single species experiments](./insidephy/examples/sbm_allspp_CellSize.png)
+
+
+## Relevant references
+
+Acevedo-Trejos, E. Marañón, E., Hellweger F. L., and Merico A. (submitted) insidephy: A package for modelling inter- and intra-specific size variability of phytoplankton. 
+
+Hellweger, F. L., & Kianirad, E. (2007). Individual-based modeling of phytoplankton: Evaluating approaches for applying the cell quota model. Journal of Theoretical Biology, 249(3), 554–565. https://doi.org/10.1016/j.jtbi.2007.08.020
+
+Marañón, E., Cermeño, P., López-Sandoval, D. C., Rodríguez-Ramos, T., Sobrino, C., Huete-Ortega, M., Blanco, J. M., & Rodríguez, J. (2013). Unimodal size scaling of phytoplankton growth and the size dependence of nutrient uptake and use. Ecology Letters, 16(3), 371–379. https://doi.org/10.1111/ele.12052
