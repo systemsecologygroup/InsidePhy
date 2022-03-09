@@ -1,5 +1,6 @@
-from insidephy.size_based_models.SBMi import SBMi
-from insidephy.size_based_models.SBMc import SBMc
+# from insidephy.size_based_models.SBMi import SBMi
+# from insidephy.size_based_models.SBMc import SBMc
+from insidephy.size_based_models.sbm import SBMc, SBMi_asyn, SBMi_syn
 import pandas as pd
 import pkg_resources
 from re import search
@@ -18,7 +19,8 @@ import matplotlib.gridspec as gridspec
 def sim_run(rel_size_range=0.25, ss_mp_names=['Synechococcus_sp', 'Micromonas_pusilla'],
             nsi_spp=[500, 500], nsi_min=100, nsi_max=2000,
             numsc=[10, 10], tend=20, dilution_rate=[0.0, 0.25, 0.50],
-            time_step=1 / 24, volume=1.0
+            time_step=1 / 24, volume=1.0, n_procs=6, n_threads=1, mem_lim=10e9,
+            sbmc_variant=False, sbmi_asyn_variant=False, sbmi_syn_variant=False
             ):
     """
     function to compute competition experiments between two species
@@ -41,8 +43,27 @@ def sim_run(rel_size_range=0.25, ss_mp_names=['Synechococcus_sp', 'Micromonas_pu
     :return: tuple with two list containing the results for the SBMc and the SBMi model type
     """
 
-    cluster = LocalCluster(threads_per_worker=1)
+    def save_to_file(sbmc, sbmi_asyn, sbmi_syn):
+        if sbmc_variant:
+            (pd.concat([exp.dtf.assign(exp='D'+str(exp._params['dilution_rate'])) for exp in sbmc])
+             .to_xarray()
+             .to_zarr('SsMp_exp.zarr', group='sbmc')
+             )
+        if sbmi_asyn_variant:
+            (pd.concat([exp.dtf.assign(exp='D'+str(exp._params['dilution_rate'])) for exp in sbmi_asyn])
+             .to_xarray()
+             .to_zarr('SsMp_exp.zarr', group='sbmi_asyn')
+             )
+        if sbmi_syn_variant:
+            (pd.concat([exp.dtf.assign(exp='D'+str(exp._params['dilution_rate'])) for exp in sbmi_syn])
+             .to_xarray()
+             .to_zarr('SsMp_exp.zarr', group='sbmi_syn')
+             )
+
+    cluster = LocalCluster(n_workers=n_procs, threads_per_worker=n_threads, memory_limit=mem_lim)
     client = Client(cluster)
+    print(client.dashboard_link)
+
     data_path = pkg_resources.resource_filename('insidephy.data', 'maranon_2013EcoLet_data.h5')
     allometries = pd.read_hdf(data_path, 'allodtf')
     cultures = pd.read_hdf(data_path, 'batchdtf')
@@ -57,22 +78,68 @@ def sim_run(rel_size_range=0.25, ss_mp_names=['Synechococcus_sp', 'Micromonas_pu
     sp_short_names = [sp[0] + sp[search('_', sp).span()[1]] for sp in ss_mp_names]
 
     sbmc_out = []
-    sbmi_out = []
+    sbmi_asyn_out = []
+    sbmi_syn_out = []
     for dr in dilution_rate:
-        sbmc = dask.delayed(SBMc)(ini_resource=np.max(init_r) * 1. / 1e6, ini_density=init_d,
-                                  min_size=init_min_size, max_size=init_max_size,
-                                  spp_names=sp_short_names, num_sc=numsc, time_end=tend,
-                                  dilution_rate=dr, volume=volume)
-        sbmi = dask.delayed(SBMi)(ini_resource=np.max(init_r) * 1. / 1e6, ini_density=init_d,
-                                  min_size=init_min_size, max_size=init_max_size,
-                                  spp_names=sp_short_names, nsi_spp=nsi_spp, nsi_min=nsi_min, nsi_max=nsi_max,
-                                  volume=volume, time_step=time_step, time_end=tend, print_time_step=1,
-                                  dilution_rate=dr)
-        sbmc_out.append(sbmc)
-        sbmi_out.append(sbmi)
+        if sbmc_variant:
+            sbmc = dask.delayed(SBMc)(ini_resource=np.max(init_r) * 1. / 1e6,  # mol N/L
+                                      ini_density=init_d,  # cells/L
+                                      min_cell_size=init_min_size,  # um^3
+                                      max_cell_size=init_max_size,  # um^3
+                                      spp_names=sp_short_names,
+                                      dilution_rate=dr,
+                                      volume=volume,
+                                      num_sc=numsc,
+                                      time_end=tend
+                                      )
+            sbmc_out.append(sbmc)
+        if sbmi_asyn_variant:
+            sbmi_asyn = dask.delayed(SBMi_asyn)(ini_resource=np.max(init_r) * 1. / 1e6,  # mol N/L
+                                                ini_density=init_d,  # cells/L
+                                                min_cell_size=init_min_size,  # um^3
+                                                max_cell_size=init_max_size,  # um^3
+                                                spp_names=sp_short_names,
+                                                dilution_rate=dr,
+                                                volume=volume,
+                                                nsi_spp=nsi_spp,
+                                                nsi_min=nsi_min,
+                                                nsi_max=nsi_max,
+                                                time_step=time_step,
+                                                time_end=tend
+                                                )
+            sbmi_asyn_out.append(sbmi_asyn)
+        if sbmi_syn_variant:
+            sbmi_syn = dask.delayed(SBMi_syn)(ini_resource=np.max(init_r) * 1. / 1e6,  # mol N/L
+                                              ini_density=init_d,  # cells/L
+                                              min_cell_size=init_min_size,  # um^3
+                                              max_cell_size=init_max_size,  # um^3
+                                              spp_names=sp_short_names,
+                                              dilution_rate=dr,
+                                              volume=volume,
+                                              nsi_spp=nsi_spp,
+                                              nsi_min=nsi_min,
+                                              nsi_max=nsi_max,
+                                              time_step=time_step,
+                                              time_end=tend
+                                              )
+            sbmi_syn_out.append(sbmi_syn)
 
-    with ProgressBar(), dask.config.set(scheduler='processes'):
-        output = dask.compute(sbmc_out, sbmi_out)
+        # sbmc = dask.delayed(SBMc)(ini_resource=np.max(init_r) * 1. / 1e6, ini_density=init_d,
+        #                           min_size=init_min_size, max_size=init_max_size,
+        #                           spp_names=sp_short_names, num_sc=numsc, time_end=tend,
+        #                           dilution_rate=dr, volume=volume)
+        # sbmi = dask.delayed(SBMi_asyn)(ini_resource=np.max(init_r) * 1. / 1e6, ini_density=init_d,
+        #                                min_size=init_min_size, max_size=init_max_size,
+        #                                spp_names=sp_short_names, nsi_spp=nsi_spp, nsi_min=nsi_min, nsi_max=nsi_max,
+        #                                volume=volume, time_step=time_step, time_end=tend, print_time_step=1,
+        #                                dilution_rate=dr)
+        # sbmc_out.append(sbmc)
+        # sbmi_out.append(sbmi)
+
+    # with ProgressBar(), dask.config.set(scheduler='processes'):
+    #     output = dask.compute(sbmc_out, sbmi_out)
+    results = dask.delayed(save_to_file)(sbmc_out, sbmi_asyn_out, sbmi_syn_out)
+    output = dask.compute(results)
     client.close()
     cluster.close()
     return output
@@ -173,41 +240,87 @@ def temporal_dynamics_plot():
     function to plot aggregate results of competition experiments for two species under three dilution rates
     :return: plot
     """
-    Ss_Mp_data_path = pkg_resources.resource_filename('insidephy.data', 'SsMp_exp.nc')
-    ds = xr.load_dataset(Ss_Mp_data_path)
+    Ss_Mp_data_path = pkg_resources.resource_filename('insidephy.examples', 'SsMp_exp.zarr')
+    ds_sbmc = xr.open_zarr(Ss_Mp_data_path+'/sbmc').to_dataframe()
+    ds_sbmi_asyn = xr.open_zarr(Ss_Mp_data_path+'/sbmi_asyn').to_dataframe()
 
     fig1, axs1 = plt.subplots(4, 3, sharex='col', sharey='row', figsize=(10, 8))
     # Resources plots
-    axs1[0, 0].plot(ds.time_sbmc, ds.sbmc_resource[0] * 1e3, c='black', lw=3.0, alpha=0.9)
-    axs1[0, 0].plot(ds.time_sbmi, ds.sbmi_resource[0] * 1e3, c='grey', ls='--', lw=3.0, alpha=0.9)
-    axs1[0, 1].plot(ds.time_sbmc, ds.sbmc_resource[1] * 1e3, c='black', lw=3.0, alpha=0.9)
-    axs1[0, 1].plot(ds.time_sbmi, ds.sbmi_resource[1] * 1e3, c='grey', ls='--', lw=3.0, alpha=0.9)
-    axs1[0, 2].plot(ds.time_sbmc, ds.sbmc_resource[2] * 1e3, c='black', lw=3.0, alpha=0.9)
-    axs1[0, 2].plot(ds.time_sbmi, ds.sbmi_resource[2] * 1e3, c='grey', ls='--', lw=3.0, alpha=0.9)
+    axs1[0, 0].plot(ds_sbmc.groupby('time').time.first(),
+                    ds_sbmc.groupby(['exp', 'time']).resource.first().loc['D0.0', :] * 1e3,
+                    c='black', lw=3.0, alpha=0.9)
+    axs1[0, 0].plot(ds_sbmi_asyn.time.unique(),
+                    ds_sbmi_asyn.groupby(['exp', 'time']).resource.first().loc['D0.0', :] * 1e3,
+                    c='grey', ls='--', lw=3.0, alpha=0.9)
+    axs1[0, 1].plot(ds_sbmc.groupby('time').time.first(),
+                    ds_sbmc.groupby(['exp', 'time']).resource.first().loc['D0.25', :] * 1e3,
+                    c='black', lw=3.0, alpha=0.9)
+    axs1[0, 1].plot(ds_sbmi_asyn.time.unique(),
+                    ds_sbmi_asyn.groupby(['exp', 'time']).resource.first().loc['D0.25', :] * 1e3,
+                    c='grey', ls='--', lw=3.0, alpha=0.9)
+    axs1[0, 2].plot(ds_sbmc.groupby('time').time.first(),
+                    ds_sbmc.groupby(['exp', 'time']).resource.first().loc['D0.5', :] * 1e3,
+                    c='black', lw=3.0, alpha=0.9)
+    axs1[0, 2].plot(ds_sbmi_asyn.time.unique(),
+                    ds_sbmi_asyn.groupby(['exp', 'time']).resource.first().loc['D0.5', :] * 1e3,
+                    c='grey', ls='--', lw=3.0, alpha=0.9)
     # Quota plots
-    axs1[1, 0].plot(ds.time_sbmc, np.sum(ds.sbmc_quota[0] * ds.sbmc_abundance[0], axis=1) * 1e3,
+    axs1[1, 0].plot(ds_sbmc.groupby('time').time.first(),
+                    ds_sbmc.groupby(['exp', 'time']).apply(lambda x: np.sum(x.quota * x.abundance) * 1e3).loc['D0.0', :],
                     c='black', lw=3.0, alpha=0.9)
-    axs1[1, 0].plot(ds.time_sbmi, ds.sbmi_tot_quota[0] * 1e3, c='grey', ls='--', lw=3.0, alpha=0.9)
-    axs1[1, 1].plot(ds.time_sbmc, np.sum(ds.sbmc_quota[1] * ds.sbmc_abundance[1], axis=1) * 1e3,
+    axs1[1, 0].plot(ds_sbmi_asyn.time.unique(),
+                    ds_sbmi_asyn.groupby(['exp', 'time']).quota.sum().loc['D0.0', :] * 1e3,
+                    c='grey', ls='--', lw=3.0, alpha=0.9)
+    axs1[1, 1].plot(ds_sbmc.groupby('time').time.first(),
+                    ds_sbmc.groupby(['exp', 'time']).apply(lambda x: np.sum(x.quota * x.abundance) * 1e3).loc['D0.25', :],
                     c='black', lw=3.0, alpha=0.9)
-    axs1[1, 1].plot(ds.time_sbmi, ds.sbmi_tot_quota[1] * 1e3, c='grey', ls='--', lw=3.0, alpha=0.9)
-    axs1[1, 2].plot(ds.time_sbmc, np.sum(ds.sbmc_quota[2] * ds.sbmc_abundance[2], axis=1) * 1e3,
+    axs1[1, 1].plot(ds_sbmi_asyn.time.unique(),
+                    ds_sbmi_asyn.groupby(['exp', 'time']).quota.sum().loc['D0.25', :] * 1e3,
+                    c='grey', ls='--', lw=3.0, alpha=0.9)
+    axs1[1, 2].plot(ds_sbmc.groupby('time').time.first(),
+                    ds_sbmc.groupby(['exp', 'time']).apply(lambda x: np.sum(x.quota * x.abundance) * 1e3).loc['D0.5', :],
                     c='black', lw=3.0, alpha=0.9)
-    axs1[1, 2].plot(ds.time_sbmi, ds.sbmi_tot_quota[2] * 1e3, c='grey', ls='--', lw=3.0, alpha=0.9)
+    axs1[1, 2].plot(ds_sbmi_asyn.time.unique(),
+                    ds_sbmi_asyn.groupby(['exp', 'time']).quota.sum().loc['D0.5', :] * 1e3,
+                    c='grey', ls='--', lw=3.0, alpha=0.9)
     # Abundance plots
-    axs1[2, 0].plot(ds.time_sbmc, np.sum(ds.sbmc_abundance[0], axis=1), c='black', lw=3.0, alpha=0.9)
-    axs1[2, 0].plot(ds.time_sbmi, ds.sbmi_tot_abundance[0], c='grey', ls='--', lw=3.0, alpha=0.9)
-    axs1[2, 1].plot(ds.time_sbmc, np.sum(ds.sbmc_abundance[1], axis=1), c='black', lw=3.0, alpha=0.9)
-    axs1[2, 1].plot(ds.time_sbmi, ds.sbmi_tot_abundance[1], c='grey', ls='--', lw=3.0, alpha=0.9)
-    axs1[2, 2].plot(ds.time_sbmc, np.sum(ds.sbmc_abundance[2], axis=1), c='black', lw=3.0, alpha=0.9)
-    axs1[2, 2].plot(ds.time_sbmi, ds.sbmi_tot_abundance[2], c='grey', ls='--', lw=3.0, alpha=0.9)
+    axs1[2, 0].plot(ds_sbmc.groupby('time').time.first(),
+                    ds_sbmc.groupby(['exp', 'time']).apply(lambda x: np.sum(x.abundance)).loc['D0.0', :],
+                    c='black', lw=3.0, alpha=0.9)
+    axs1[2, 0].plot(ds_sbmi_asyn.time.unique(),
+                    ds_sbmi_asyn.groupby(['exp', 'time']).rep_nind.sum().loc['D0.0', :],
+                    c='grey', ls='--', lw=3.0, alpha=0.9)
+    axs1[2, 1].plot(ds_sbmc.groupby('time').time.first(),
+                    ds_sbmc.groupby(['exp', 'time']).apply(lambda x: np.sum(x.abundance)).loc['D0.25', :],
+                    c='black', lw=3.0, alpha=0.9)
+    axs1[2, 1].plot(ds_sbmi_asyn.time.unique(),
+                    ds_sbmi_asyn.groupby(['exp', 'time']).rep_nind.sum().loc['D0.25', :],
+                    c='grey', ls='--', lw=3.0, alpha=0.9)
+    axs1[2, 2].plot(ds_sbmc.groupby('time').time.first(),
+                    ds_sbmc.groupby(['exp', 'time']).apply(lambda x: np.sum(x.abundance)).loc['D0.5', :],
+                    c='black', lw=3.0, alpha=0.9)
+    axs1[2, 2].plot(ds_sbmi_asyn.time.unique(),
+                    ds_sbmi_asyn.groupby(['exp', 'time']).rep_nind.sum().loc['D0.5', :],
+                    c='grey', ls='--', lw=3.0, alpha=0.9)
     # Biomass plots
-    axs1[3, 0].plot(ds.time_sbmc, np.sum(ds.sbmc_biomass[0], axis=1) * 1e3, c='black', lw=3.0, alpha=0.9)
-    axs1[3, 0].plot(ds.time_sbmi, ds.sbmi_tot_biomass[0] * 1e3, c='grey', ls='--', lw=3.0, alpha=0.9)
-    axs1[3, 1].plot(ds.time_sbmc, np.sum(ds.sbmc_biomass[1], axis=1) * 1e3, c='black', lw=3.0, alpha=0.9)
-    axs1[3, 1].plot(ds.time_sbmi, ds.sbmi_tot_biomass[1] * 1e3, c='grey', ls='--', lw=3.0, alpha=0.9)
-    axs1[3, 2].plot(ds.time_sbmc, np.sum(ds.sbmc_biomass[2], axis=1) * 1e3, c='black', lw=3.0, alpha=0.9)
-    axs1[3, 2].plot(ds.time_sbmi, ds.sbmi_tot_biomass[2] * 1e3, c='grey', ls='--', lw=3.0, alpha=0.9)
+    axs1[3, 0].plot(ds_sbmc.groupby('time').time.first(),
+                    ds_sbmc.groupby(['exp', 'time']).apply(lambda x: np.sum(x.biomass)).loc['D0.0', :],
+                    c='black', lw=3.0, alpha=0.9)
+    axs1[3, 0].plot(ds_sbmi_asyn.time.unique(),
+                    ds_sbmi_asyn.groupby(['exp', 'time']).biomass.sum().loc['D0.0', :],
+                    c='grey', ls='--', lw=3.0, alpha=0.9)
+    axs1[3, 1].plot(ds_sbmc.groupby('time').time.first(),
+                    ds_sbmc.groupby(['exp', 'time']).apply(lambda x: np.sum(x.biomass)).loc['D0.25', :],
+                    c='black', lw=3.0, alpha=0.9)
+    axs1[3, 1].plot(ds_sbmi_asyn.time.unique(),
+                    ds_sbmi_asyn.groupby(['exp', 'time']).biomass.sum().loc['D0.25', :],
+                    c='grey', ls='--', lw=3.0, alpha=0.9)
+    axs1[3, 2].plot(ds_sbmc.groupby('time').time.first(),
+                    ds_sbmc.groupby(['exp', 'time']).apply(lambda x: np.sum(x.biomass)).loc['D0.5', :],
+                    c='black', lw=3.0, alpha=0.9)
+    axs1[3, 2].plot(ds_sbmi_asyn.time.unique(),
+                    ds_sbmi_asyn.groupby(['exp', 'time']).biomass.sum().loc['D0.5', :],
+                    c='grey', ls='--', lw=3.0, alpha=0.9)
     # customization
     axs1[2, 0].set_yscale('log')
     axs1[3, 0].set_yscale('log')
@@ -238,23 +351,48 @@ def spp_weights_plot():
     Method to plot biomass and abundance of the two species competition experiment.
     :return: plot
     """
-    Ss_Mp_data_path = pkg_resources.resource_filename('insidephy.data', 'SsMp_exp.nc')
-    ds = xr.load_dataset(Ss_Mp_data_path)
-    cols = ['#5494aeff', '#7cb950ff']
-    fig0, axs0 = plt.subplots(2, 3,  sharex='col', sharey='row', figsize=(8, 6))
-    axs0[0, 0].plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[0, 0, :], c=cols[0], ls='--', lw=3.0)
-    axs0[0, 0].plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[0, 1, :], c=cols[1], ls='--', lw=3.0)
-    axs0[0, 1].plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[1, 0, :], c=cols[0], ls='--', lw=3.0)
-    axs0[0, 1].plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[1, 1, :], c=cols[1], ls='--', lw=3.0)
-    axs0[0, 2].plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[2, 0, :], c=cols[0], ls='--', lw=3.0)
-    axs0[0, 2].plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[2, 1, :], c=cols[1], ls='--', lw=3.0)
+    Ss_Mp_data_path = pkg_resources.resource_filename('insidephy.examples', 'SsMp_exp.zarr')
+    ds_sbmi_asyn = xr.open_zarr(Ss_Mp_data_path + '/sbmi_asyn').to_dataframe()
 
-    axs0[1, 0].plot(ds.time_sbmi, ds.sbmi_agents_biomass.sum(axis=3)[0, 0, :], c=cols[0], ls='--', lw=3.0)
-    axs0[1, 0].plot(ds.time_sbmi, ds.sbmi_agents_biomass.sum(axis=3)[0, 1, :], c=cols[1], ls='--', lw=3.0)
-    axs0[1, 1].plot(ds.time_sbmi, ds.sbmi_agents_biomass.sum(axis=3)[1, 0, :], c=cols[0], ls='--', lw=3.0)
-    axs0[1, 1].plot(ds.time_sbmi, ds.sbmi_agents_biomass.sum(axis=3)[1, 1, :], c=cols[1], ls='--', lw=3.0)
-    axs0[1, 2].plot(ds.time_sbmi, ds.sbmi_agents_biomass.sum(axis=3)[2, 0, :], c=cols[0], ls='--', lw=3.0)
-    axs0[1, 2].plot(ds.time_sbmi, ds.sbmi_agents_biomass.sum(axis=3)[2, 1, :], c=cols[1], ls='--', lw=3.0)
+    cols = ['#5494aeff', '#7cb950ff']
+    fig0, axs0 = plt.subplots(2, 3, sharex='col', sharey='row', figsize=(8, 6))
+    axs0[0, 0].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.0', 'Ss', :],
+                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.0', 'Ss', :],
+                    c=cols[0], ls='--', lw=3.0)
+    axs0[0, 0].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.0', 'Mp', :],
+                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.0', 'Mp', :],
+                    c=cols[1], ls='--', lw=3.0)
+    axs0[0, 1].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.25', 'Ss', :],
+                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.25', 'Ss', :],
+                    c=cols[0], ls='--', lw=3.0)
+    axs0[0, 1].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.25', 'Mp', :],
+                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.25', 'Mp', :],
+                    c=cols[1], ls='--', lw=3.0)
+    axs0[0, 2].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.5', 'Ss', :],
+                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.5', 'Ss', :],
+                    c=cols[0], ls='--', lw=3.0)
+    axs0[0, 2].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.5', 'Mp', :],
+                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.5', 'Mp', :],
+                    c=cols[1], ls='--', lw=3.0)
+
+    axs0[1, 0].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.0', 'Ss', :],
+                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).biomass.sum().loc['D0.0', 'Ss', :],
+                    c=cols[0], ls='--', lw=3.0)
+    axs0[1, 0].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.0', 'Mp', :],
+                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).biomass.sum().loc['D0.0', 'Mp', :],
+                    c=cols[1], ls='--', lw=3.0)
+    axs0[1, 1].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.25', 'Ss', :],
+                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).biomass.sum().loc['D0.25', 'Ss', :],
+                    c=cols[0], ls='--', lw=3.0)
+    axs0[1, 1].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.25', 'Mp', :],
+                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).biomass.sum().loc['D0.25', 'Mp', :],
+                    c=cols[1], ls='--', lw=3.0)
+    axs0[1, 2].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.5', 'Ss', :],
+                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).biomass.sum().loc['D0.5', 'Ss', :],
+                    c=cols[0], ls='--', lw=3.0)
+    axs0[1, 2].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.5', 'Mp', :],
+                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).biomass.sum().loc['D0.5', 'Mp', :],
+                    c=cols[1], ls='--', lw=3.0)
 
     axs0[1, 0].set_yscale('log')
     axs0[0, 0].set_yscale('log')
@@ -279,36 +417,37 @@ def distribution_plot():
     :return: plot
     """
 
-    Ss_Mp_data_path = pkg_resources.resource_filename('insidephy.data', 'SsMp_exp.nc')
-    ds = xr.load_dataset(Ss_Mp_data_path)
+    Ss_Mp_data_path = pkg_resources.resource_filename('insidephy.examples', 'SsMp_exp.zarr')
+    ds_sbmi_asyn = xr.open_zarr(Ss_Mp_data_path + '/sbmi_asyn').to_dataframe()
+    ds_sbmi_asyn.spp = ds_sbmi_asyn.spp.astype('category').cat.reorder_categories(['Ss', 'Mp'], ordered=True)
     cols = ['#5494aeff', '#7cb950ff']
     # Reshape of data to plot size distributions of species
-    dtf00 = pd.DataFrame({'cellsize': ds.sbmi_agents_size[0].values.flatten(),
-                          'abundance': ds.sbmi_agents_abundance[0].values.flatten(),
-                          'time': np.tile(np.repeat(ds.time_sbmi.values, ds.sbmi_agents_size[0].shape[-1]),
-                                          ds.sbmi_agents_size[0].shape[0]),
-                          'names': np.tile(np.repeat(ds.spp_name_short[0].values, ds.sbmi_agents_size[0].shape[-1]),
-                                           ds.sbmi_agents_size[0].shape[1])})
-    dtf00['logcellsize'] = dtf00['cellsize'].transform(np.log10).values
-    dtf00['logabundance'] = dtf00['abundance'].transform(np.log10).values
-
-    dtf25 = pd.DataFrame({'cellsize': ds.sbmi_agents_size[1].values.flatten(),
-                          'abundance': ds.sbmi_agents_abundance[1].values.flatten(),
-                          'time': np.tile(np.repeat(ds.time_sbmi.values, ds.sbmi_agents_size[1].shape[-1]),
-                                          ds.sbmi_agents_size[1].shape[0]),
-                          'names': np.tile(np.repeat(ds.spp_name_short[1].values, ds.sbmi_agents_size[1].shape[-1]),
-                                           ds.sbmi_agents_size[1].shape[1])})
-    dtf25['logcellsize'] = dtf25['cellsize'].transform(np.log10).values
-    dtf25['logabundance'] = dtf25['abundance'].transform(np.log10).values
-
-    dtf50 = pd.DataFrame({'cellsize': ds.sbmi_agents_size[2].values.flatten(),
-                          'abundance': ds.sbmi_agents_abundance[2].values.flatten(),
-                          'time': np.tile(np.repeat(ds.time_sbmi.values, ds.sbmi_agents_size[2].shape[-1]),
-                                          ds.sbmi_agents_size[2].shape[0]),
-                          'names': np.tile(np.repeat(ds.spp_name_short[2].values, ds.sbmi_agents_size[2].shape[-1]),
-                                           ds.sbmi_agents_size[2].shape[1])})
-    dtf50['logcellsize'] = dtf50['cellsize'].transform(np.log10).values
-    dtf50['logabundance'] = dtf50['abundance'].transform(np.log10).values
+    # dtf00 = pd.DataFrame({'cellsize': ds.sbmi_agents_size[0].values.flatten(),
+    #                       'abundance': ds.sbmi_agents_abundance[0].values.flatten(),
+    #                       'time': np.tile(np.repeat(ds.time_sbmi.values, ds.sbmi_agents_size[0].shape[-1]),
+    #                                       ds.sbmi_agents_size[0].shape[0]),
+    #                       'names': np.tile(np.repeat(ds.spp_name_short[0].values, ds.sbmi_agents_size[0].shape[-1]),
+    #                                        ds.sbmi_agents_size[0].shape[1])})
+    # dtf00['logcellsize'] = dtf00['cellsize'].transform(np.log10).values
+    # dtf00['logabundance'] = dtf00['abundance'].transform(np.log10).values
+    #
+    # dtf25 = pd.DataFrame({'cellsize': ds.sbmi_agents_size[1].values.flatten(),
+    #                       'abundance': ds.sbmi_agents_abundance[1].values.flatten(),
+    #                       'time': np.tile(np.repeat(ds.time_sbmi.values, ds.sbmi_agents_size[1].shape[-1]),
+    #                                       ds.sbmi_agents_size[1].shape[0]),
+    #                       'names': np.tile(np.repeat(ds.spp_name_short[1].values, ds.sbmi_agents_size[1].shape[-1]),
+    #                                        ds.sbmi_agents_size[1].shape[1])})
+    # dtf25['logcellsize'] = dtf25['cellsize'].transform(np.log10).values
+    # dtf25['logabundance'] = dtf25['abundance'].transform(np.log10).values
+    #
+    # dtf50 = pd.DataFrame({'cellsize': ds.sbmi_agents_size[2].values.flatten(),
+    #                       'abundance': ds.sbmi_agents_abundance[2].values.flatten(),
+    #                       'time': np.tile(np.repeat(ds.time_sbmi.values, ds.sbmi_agents_size[2].shape[-1]),
+    #                                       ds.sbmi_agents_size[2].shape[0]),
+    #                       'names': np.tile(np.repeat(ds.spp_name_short[2].values, ds.sbmi_agents_size[2].shape[-1]),
+    #                                        ds.sbmi_agents_size[2].shape[1])})
+    # dtf50['logcellsize'] = dtf50['cellsize'].transform(np.log10).values
+    # dtf50['logabundance'] = dtf50['abundance'].transform(np.log10).values
 
     fig = plt.figure(figsize=(10, 8))
     gs0 = gridspec.GridSpec(2, 1, hspace=0.20, figure=fig)
@@ -330,36 +469,63 @@ def distribution_plot():
     ax14 = fig.add_subplot(gs01[2, 1])
     ax15 = fig.add_subplot(gs01[2, 2])
 
-    ax1.plot(ds.time_sbmi, ds.sbmi_resource[0, :] * 1e3, c='black', lw=3.0, clip_on=False)
-    ax2.plot(ds.time_sbmi, ds.sbmi_resource[1, :] * 1e3, c='black', lw=3.0)
-    ax3.plot(ds.time_sbmi, ds.sbmi_resource[2, :] * 1e3, c='black', lw=3.0)
+    ax1.plot(ds_sbmi_asyn.time.unique(),
+             ds_sbmi_asyn.groupby(['exp', 'time']).resource.first().loc['D0.0', :] * 1e3,
+             c='black', lw=3.0, clip_on=False)
+    ax2.plot(ds_sbmi_asyn.time.unique(),
+             ds_sbmi_asyn.groupby(['exp', 'time']).resource.first().loc['D0.25', :] * 1e3,
+             c='black', lw=3.0)
+    ax3.plot(ds_sbmi_asyn.time.unique(),
+             ds_sbmi_asyn.groupby(['exp', 'time']).resource.first().loc['D0.5', :] * 1e3,
+             c='black', lw=3.0)
 
-    ax4.plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[0, 0, :], c=cols[0], lw=3.0)
-    ax4.plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[0, 1, :], c=cols[1], lw=3.0)
-    ax5.plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[1, 0, :], c=cols[0], lw=3.0)
-    ax5.plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[1, 1, :], c=cols[1], lw=3.0)
-    ax6.plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[2, 0, :], c=cols[0], lw=3.0)
-    ax6.plot(ds.time_sbmi, ds.sbmi_agents_abundance.sum(axis=3)[2, 1, :], c=cols[1], lw=3.0)
+    ax4.plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.0', 'Ss', :],
+             ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.0', 'Ss', :],
+             c=cols[0], lw=3.0)
+    ax4.plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.0', 'Mp', :],
+             ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.0', 'Mp', :],
+             c=cols[1], lw=3.0)
+    ax5.plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.25', 'Ss', :],
+             ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.25', 'Ss', :],
+             c=cols[0], lw=3.0)
+    ax5.plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.25', 'Mp', :],
+             ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.25', 'Mp', :],
+             c=cols[1], lw=3.0)
+    ax6.plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.5', 'Ss', :],
+             ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.5', 'Ss', :],
+             c=cols[0], lw=3.0)
+    ax6.plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.5', 'Mp', :],
+             ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.5', 'Mp', :],
+             c=cols[1], lw=3.0)
 
-    sns.kdeplot(data=dtf00[dtf00.time == 0], x='cellsize', weights='abundance', hue='names', palette=cols,
+    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.0', ds_sbmi_asyn.time==0)],
+                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
                 legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax7)
-    sns.kdeplot(data=dtf00[dtf00.time == 10], x='cellsize', weights='abundance', hue='names', palette=cols,
+    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.0', ds_sbmi_asyn.time==10)],
+                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
                 legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax10)
-    sns.kdeplot(data=dtf00[dtf00.time == 20], x='cellsize', weights='abundance', hue='names', palette=cols,
+    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.0', ds_sbmi_asyn.time==20)],
+                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
                 legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax13)
 
-    sns.kdeplot(data=dtf25[dtf25.time == 0], x='cellsize', weights='abundance', hue='names', palette=cols,
+    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.25', ds_sbmi_asyn.time==0)],
+                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
                 legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax8)
-    sns.kdeplot(data=dtf25[dtf25.time == 10], x='cellsize', weights='abundance', hue='names', palette=cols,
-                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax11,)
-    sns.kdeplot(data=dtf25[dtf25.time == 20], x='cellsize', weights='abundance', hue='names', palette=cols,
+    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.25', ds_sbmi_asyn.time==10)],
+                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
+                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax11, )
+    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.25', ds_sbmi_asyn.time==20)],
+                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
                 legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax14)
 
-    sns.kdeplot(data=dtf50[dtf50.time == 0], x='cellsize', weights='abundance', hue='names', palette=cols,
+    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.5', ds_sbmi_asyn.time==0)],
+                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
                 legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax9)
-    sns.kdeplot(data=dtf50[dtf50.time == 10], x='cellsize', weights='abundance', hue='names', palette=cols,
+    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.5', ds_sbmi_asyn.time==10)],
+                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
                 legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax12)
-    sns.kdeplot(data=dtf50[dtf50.time == 20], x='cellsize', weights='abundance', hue='names', palette=cols,
+    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.5', ds_sbmi_asyn.time==20)],
+                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
                 legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax15)
 
     for ax in [ax1, ax2, ax3]:
@@ -388,10 +554,10 @@ def distribution_plot():
         ax.tick_params(labelleft=True)
 
     for ax in fig.axes[6:9]:
-        ax.set_ylim(0, 2.5)
+        ax.set_ylim(0, 3)
 
     for ax in fig.axes[9:12]:
-        ax.set_ylim(0, 1.2)
+        ax.set_ylim(0, 1.5)
 
     for ax in fig.axes[12:]:
         ax.set_xlabel('Cell size [$\mu$m$^{3}$]', size=11, fontweight="bold")
@@ -413,4 +579,3 @@ def distribution_plot():
                            Patch(facecolor=cols[1], edgecolor='black', label='Mp')]
     ax6.legend(handles=legend_elements_ax1, ncol=2, bbox_to_anchor=(0, 1, 1, 0), loc='upper right')
     fig.savefig('Ss_Mp_size_distribution.png', dpi=600)
-

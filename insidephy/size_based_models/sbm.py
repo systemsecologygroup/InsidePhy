@@ -183,7 +183,8 @@ class SBMc(SBMbase):
 
 class SBMi_syn(SBMbase):
     def __init__(self, ini_resource, ini_density, spp_names, min_cell_size, max_cell_size, nsi_spp, nsi_min, nsi_max,
-                 dilution_rate, volume, time_end=20, time_step=1 / 24, print_time_step=0.5, random_seed=1234):
+                 dilution_rate, volume, time_end=20, time_step=1 / 24, print_time_step=0.5, random_seed=1234,
+                 init_size_random=True):
         """
         Size-based model of individual phytoplankton cells with synchronous updating of agents.
         :param nsi_spp: list or tuple of integers
@@ -198,6 +199,9 @@ class SBMi_syn(SBMbase):
         time steps used in the simulations
         :param print_time_step: integer
         time step in days used to store results
+        :param init_size_random: bool
+        set individual's size to mean or randon within range
+
         :return: size-based model with solution
         """
         super().__init__(ini_resource, ini_density, spp_names, min_cell_size, max_cell_size, dilution_rate, volume)
@@ -234,16 +238,24 @@ class SBMi_syn(SBMbase):
         self._time_step = time_step
         self._dtp = print_time_step
         self._time_end = time_end
+        self._init_size_random = init_size_random
         self.run()
 
     def initialize(self):
-        spp_size_spectra = np.concatenate([10 ** self._rng.uniform(np.log10(minsize),
-                                                                   np.log10(maxsize),
-                                                                   size=ag)
-                                           for minsize, maxsize, ag in
-                                           zip(self._params['min_cell_size'],
-                                               self._params['max_cell_size'],
-                                               self._params['nsi_spp'])])
+        if self._init_size_random:
+            spp_size_spectra = np.concatenate([10 ** self._rng.uniform(np.log10(minsize),
+                                                                       np.log10(maxsize),
+                                                                       size=ag)
+                                               for minsize, maxsize, ag in
+                                               zip(self._params['min_cell_size'],
+                                                   self._params['max_cell_size'],
+                                                   self._params['nsi_spp'])])
+        else:
+            spp_size_spectra = np.concatenate([np.repeat((minsize + maxsize) / 2, ag)
+                                               for minsize, maxsize, ag in
+                                               zip(self._params['min_cell_size'],
+                                                   self._params['max_cell_size'],
+                                                   self._params['nsi_spp'])])
         ids = np.concatenate([np.arange(ag) for ag in self._params['nsi_spp']])
         ini_biomass = allo.biomass(spp_size_spectra)
         q_max = allo.q_max(spp_size_spectra) / ini_biomass
@@ -477,11 +489,34 @@ class PhytoCell:
     """
 
     def __init__(self, min_cell_size=0.12, max_cell_size=2.5e7, rep_nind=None,
-                 init_cell_size=None, init_biomass=None, init_quota=None):
+                 init_cell_size=None, init_biomass=None, init_quota=None,
+                 init_size_random=True):
+        """
+        Phytoplankton cell (agent) is characterised by its nutrient related traits,
+        which are determined by allometric functions observed by
+        Marañon et al. (2013, Eco. Lett.)
+        :param min_cell_size: float,
+        minimum cell size of phytoplankton population (um^3)
+        :param max_cell_size: float,
+        maximum cell size of phytoplankton population (um^3)
+        :param rep_nind: integer,
+        abundance of individuals each super individual represents
+        :param init_cell_size: float,
+        initial cell size (um^3 / cell)
+        :param init_biomass: float,
+        initial biomass of cell (mol C / cell)
+        :param init_quota: float,
+        initial quota (mol N / mol C)
+        :param init_size_random: bool
+
+        """
         # traits and variables:
         if init_cell_size is None:
-            self.cell_size = 10 ** np.random.uniform(np.log10(min_cell_size),
-                                                     np.log10(max_cell_size))  # Volume um3/cell
+            if init_size_random:
+                self.cell_size = 10 ** np.random.uniform(np.log10(min_cell_size),
+                                                         np.log10(max_cell_size))  # Volume um3/cell
+            else:
+                self.cell_size = (min_cell_size + max_cell_size) / 2.
         else:
             self.cell_size = init_cell_size
         if init_biomass is None:
@@ -725,8 +760,8 @@ class SBMi_asyn(SBMbase):
                 max_cell_size=self._params['max_cell_size'][sp],
                 rep_nind=self._params['ini_nind'][sp] /
                          self._params['nsi_spp'][sp])
-             for sp in range(len(self._params['spp_names'])) for numag in
-             range(self._nsi_spp[sp])})  # add phytoplankton agents
+                for sp in range(len(self._params['spp_names'])) for numag in
+                range(self._nsi_spp[sp])})  # add phytoplankton agents
 
     def update(self):
         """
@@ -781,7 +816,7 @@ class SBMi_asyn(SBMbase):
         self.dtf = self.dtf.append(self.to_DataFrame(0))
         while simtime <= self._time_end + self._dt:
             self._R += (self._params['dilution_rate'] * (
-                        self._params['ini_resource'] - self._R)) * self._dt  # Change in Resource concentration
+                    self._params['ini_resource'] - self._R)) * self._dt  # Change in Resource concentration
             self.update()  # Update state of all agents
             if simtime >= printtime:  # Save results
                 self.dtf = self.dtf.append(self.to_DataFrame(printtime))
@@ -795,30 +830,32 @@ def _model_run(mtype,
                spp_names=('Aa', 'Bb'), dilution_rate=0.0, volume=1.0, nsi_spp=(100, 100), nsi_min=100,
                nsi_max=1000, num_sc=(100, 100), time_end=10):
     if mtype == 'sbmi_syn':
-        SBMi_syn(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
-                 max_cell_size=max_size, spp_names=spp_names, dilution_rate=dilution_rate,
-                 volume=volume, nsi_spp=nsi_spp, nsi_min=nsi_min,
-                 nsi_max=nsi_max, time_end=time_end)
+        return SBMi_syn(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
+                        max_cell_size=max_size, spp_names=spp_names, dilution_rate=dilution_rate,
+                        volume=volume, nsi_spp=nsi_spp, nsi_min=nsi_min,
+                        nsi_max=nsi_max, time_end=time_end)
     elif mtype == 'sbmi_asyn':
-        SBMi_asyn(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
-                  max_cell_size=max_size, spp_names=spp_names, dilution_rate=dilution_rate,
-                  volume=volume, nsi_spp=nsi_spp, nsi_min=nsi_min,
-                  nsi_max=nsi_max, time_end=time_end)
+        return SBMi_asyn(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
+                         max_cell_size=max_size, spp_names=spp_names, dilution_rate=dilution_rate,
+                         volume=volume, nsi_spp=nsi_spp, nsi_min=nsi_min,
+                         nsi_max=nsi_max, time_end=time_end)
     elif mtype == 'sbmc':
-        SBMc(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
-             max_cell_size=max_size, spp_names=spp_names, dilution_rate=dilution_rate,
-             volume=volume, num_sc=num_sc, time_end=time_end)
+        return SBMc(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
+                    max_cell_size=max_size, spp_names=spp_names, dilution_rate=dilution_rate,
+                    volume=volume, num_sc=num_sc, time_end=time_end)
+
     else:
-        raise ValueError("mtype must be a string specifipying the name of the "
+        raise ValueError("mtype must be a string specifying the name of the "
                          "size model type, either: sbmc, sbmi_syn, sbmi_asyn. "
                          "Instead got {!r}".format(mtype))
 
-    """
-    benchmarking results for size-based models on 11.02.22
-    %timeit _model_run('sbmc')
-    39.7 ms ± 2.03 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
-    %timeit _model_run('sbmi_syn')
-    3.74 s ± 30.9 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-    %timeit _model_run('sbmi_asyn')
-    9.07 s ± 833 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-    """
+
+"""
+benchmarking results for size-based models on 11.02.22
+%timeit _model_run('sbmc')
+39.7 ms ± 2.03 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
+%timeit _model_run('sbmi_syn')
+3.74 s ± 30.9 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+%timeit _model_run('sbmi_asyn')
+9.07 s ± 833 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+"""

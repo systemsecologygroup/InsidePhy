@@ -92,7 +92,7 @@ def plots(dilution_rate=0.0):
     fig1, axs1 = plt.subplots(5, 3, sharex='col', sharey='row', figsize=(10, 8))
     # Resources plots
     axs1[0, 0].plot(sbmc.dtf.groupby('time').time.first(),
-                    sbmc.dtf.groupby('time').resource.first() * 1e3, c='black',ls='--', lw=3.0, alpha=0.9)
+                    sbmc.dtf.groupby('time').resource.first() * 1e3, c='black', ls='--', lw=3.0, alpha=0.9)
     axs1[0, 0].plot(sbmi.dtf.time.unique(),
                     sbmi.dtf.groupby('time').resource.first() * 1e3, c='grey', lw=3.0, alpha=0.5)
     axs1[0, 0].plot(dev.dtf.time.unique(), dev.dtf.groupby('time').resource.first() * 1e3, c='red', lw=3.0, alpha=0.9)
