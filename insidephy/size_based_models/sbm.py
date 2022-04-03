@@ -183,8 +183,7 @@ class SBMc(SBMbase):
 
 class SBMi_syn(SBMbase):
     def __init__(self, ini_resource, ini_density, spp_names, min_cell_size, max_cell_size, nsi_spp, nsi_min, nsi_max,
-                 dilution_rate, volume, time_end=20, time_step=1 / 24, print_time_step=0.5, random_seed=1234,
-                 init_size_random=True):
+                 dilution_rate, volume, time_end=20, time_step=1 / 24, print_time_step=0.5, random_seed=1234):
         """
         Size-based model of individual phytoplankton cells with synchronous updating of agents.
         :param nsi_spp: list or tuple of integers
@@ -199,8 +198,6 @@ class SBMi_syn(SBMbase):
         time steps used in the simulations
         :param print_time_step: integer
         time step in days used to store results
-        :param init_size_random: bool
-        set individual's size to mean or randon within range
 
         :return: size-based model with solution
         """
@@ -238,24 +235,18 @@ class SBMi_syn(SBMbase):
         self._time_step = time_step
         self._dtp = print_time_step
         self._time_end = time_end
-        self._init_size_random = init_size_random
         self.run()
 
     def initialize(self):
-        if self._init_size_random:
-            spp_size_spectra = np.concatenate([10 ** self._rng.uniform(np.log10(minsize),
-                                                                       np.log10(maxsize),
-                                                                       size=ag)
-                                               for minsize, maxsize, ag in
-                                               zip(self._params['min_cell_size'],
-                                                   self._params['max_cell_size'],
-                                                   self._params['nsi_spp'])])
-        else:
-            spp_size_spectra = np.concatenate([np.repeat((minsize + maxsize) / 2, ag)
-                                               for minsize, maxsize, ag in
-                                               zip(self._params['min_cell_size'],
-                                                   self._params['max_cell_size'],
-                                                   self._params['nsi_spp'])])
+
+        spp_size_spectra = np.concatenate([10 ** self._rng.uniform(np.log10(minsize),
+                                                                   np.log10(maxsize),
+                                                                   size=ag)
+                                           for minsize, maxsize, ag in
+                                           zip(self._params['min_cell_size'],
+                                               self._params['max_cell_size'],
+                                               self._params['nsi_spp'])])
+
         ids = np.concatenate([np.arange(ag) for ag in self._params['nsi_spp']])
         ini_biomass = allo.biomass(spp_size_spectra)
         q_max = allo.q_max(spp_size_spectra) / ini_biomass
