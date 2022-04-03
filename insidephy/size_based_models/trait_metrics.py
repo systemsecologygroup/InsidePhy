@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 
 def cwm(cell_size, weight, axis=1):
@@ -34,25 +35,45 @@ def cwv(cell_size, weight, axis=1):
     return np.nansum(cell_size ** 2 * weight, axis=axis) / np.nansum(weight, axis=axis) - weighted_mean ** 2
 
 
-def size_var_comp_sbmi(cell_size, weight):
+def size_var_comp_sbmi(dtf, log_trans=True):
     """
-    Computation of trait variance components for the trait cell size and
-    following de Bello et al. (2011 Methods Ecol. & Evol.).
-    :param cell_size: array_like
-        phytoplankton size spectra as obtained from SBMi model
-    :param weight: array_like
-        phytoplankton abundance or biomass spectra as obtained from SBMi model
-    :return: ndarrays
-        arrays with computed total, between and within cell size variance, as well
-        as mean cell size for the community and for each species.
+    Size variance components for a community composed of 'i' species
+    each with an 'n' number of individuals. Based on the work of
+    de Bello et al. (2011 Methods Ecol. & Evol.)
+    :param log_trans: bool
+                      log-transform cell size
+    :param dtf: pandas.DataFrame
+                dataframe with output from simulation using size-based model
+                of individual cells 'sbm.SBMi_syn' or 'sbm.SBMi_asyn'
+
+    :return: pandas.DataFrame with mean size and size variance components as columns.
     """
-    no_ind_i = weight.sum(axis=3)
-    tot_no_ind = weight.sum(axis=(1, 3))
-    mean_size_i = (cell_size * weight / no_ind_i).sum(axis=3)
-    mean_size_com = np.sum(no_ind_i / tot_no_ind * mean_size_i, axis=1)
-    tot_var_ss = np.sum((cell_size - mean_size_com) ** 2 * weight / no_ind_i, axis=3)
-    tot_var = np.sum(no_ind_i / tot_no_ind * tot_var_ss, axis=1)
-    between_var = np.sum(no_ind_i / tot_no_ind * (mean_size_i - mean_size_com) ** 2, axis=1)
-    within_var_ss = np.sum((cell_size - mean_size_i) ** 2 * weight / no_ind_i, axis=3)
-    within_var = np.sum(no_ind_i / tot_no_ind * within_var_ss, axis=1)
-    return tot_var, between_var, within_var, mean_size_com, mean_size_i
+    if log_trans:
+        cell_size_i_n = dtf.cell_size.copy()
+        log_cell_size_i_n = np.log(dtf.cell_size)
+        dtf = dtf.assign(cell_size=log_cell_size_i_n, cell_size_lin=cell_size_i_n)
+
+    no_ind_i = dtf.groupby('spp').sum().rep_nind
+    mean_size_i = dtf.groupby('spp').apply(lambda x: np.sum(x.cell_size * x.rep_nind / x.rep_nind.sum()))
+    mean_size_com = np.sum(no_ind_i / no_ind_i.sum() * mean_size_i)
+    between_var = np.sum(no_ind_i / no_ind_i.sum() * (mean_size_i - mean_size_com) ** 2)
+    within_i_ss = dtf.groupby('spp').apply(lambda x: np.sum(
+        x.rep_nind / x.rep_nind.sum() * (x.cell_size - np.sum(x.cell_size * x.rep_nind / x.rep_nind.sum())) ** 2))
+    within_var = np.sum((no_ind_i / no_ind_i.sum() * within_i_ss))
+    tot_var_ss = dtf.groupby('spp').apply(
+        lambda x: np.sum(x.rep_nind / x.rep_nind.sum() * (x.cell_size - mean_size_com) ** 2))
+    tot_var = np.sum((no_ind_i / no_ind_i.sum() * tot_var_ss))
+
+    out_dtf = pd.DataFrame({
+        'tot_var': [tot_var],
+        'between_var': [between_var],
+        'within_var': [within_var],
+        'mean_size_com': [mean_size_com]
+    })
+
+    spp_cols = {}
+    for sp in range(mean_size_i.size):
+        spp_cols['name_spp' + str(sp + 1).zfill(2)] = [mean_size_i.index[sp]]
+        spp_cols['mean_size_spp' + str(sp + 1).zfill(2)] = [mean_size_i[sp]]
+
+    return out_dtf.join(pd.DataFrame(spp_cols))
