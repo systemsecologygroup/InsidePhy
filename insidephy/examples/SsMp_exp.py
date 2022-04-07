@@ -1,5 +1,3 @@
-# from insidephy.size_based_models.SBMi import SBMi
-# from insidephy.size_based_models.SBMc import SBMc
 from insidephy.size_based_models.sbm import SBMc, SBMi_asyn, SBMi_syn
 import pandas as pd
 import pkg_resources
@@ -7,7 +5,6 @@ from re import search
 import numpy as np
 import dask
 from dask.distributed import Client, LocalCluster
-from dask.diagnostics import ProgressBar
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import seaborn as sns
@@ -124,115 +121,11 @@ def sim_run(rel_size_range=0.25, ss_mp_names=['Synechococcus_sp', 'Micromonas_pu
                                               )
             sbmi_syn_out.append(sbmi_syn)
 
-        # sbmc = dask.delayed(SBMc)(ini_resource=np.max(init_r) * 1. / 1e6, ini_density=init_d,
-        #                           min_size=init_min_size, max_size=init_max_size,
-        #                           spp_names=sp_short_names, num_sc=numsc, time_end=tend,
-        #                           dilution_rate=dr, volume=volume)
-        # sbmi = dask.delayed(SBMi_asyn)(ini_resource=np.max(init_r) * 1. / 1e6, ini_density=init_d,
-        #                                min_size=init_min_size, max_size=init_max_size,
-        #                                spp_names=sp_short_names, nsi_spp=nsi_spp, nsi_min=nsi_min, nsi_max=nsi_max,
-        #                                volume=volume, time_step=time_step, time_end=tend, print_time_step=1,
-        #                                dilution_rate=dr)
-        # sbmc_out.append(sbmc)
-        # sbmi_out.append(sbmi)
-
-    # with ProgressBar(), dask.config.set(scheduler='processes'):
-    #     output = dask.compute(sbmc_out, sbmi_out)
     results = dask.delayed(save_to_file)(sbmc_out, sbmi_asyn_out, sbmi_syn_out)
     output = dask.compute(results)
     client.close()
     cluster.close()
     return output
-
-
-def save_dataset(out_file_name='SsMp_exp.nc'):
-    """
-    function to save results of competition experiments for two species under three dilution rates
-    using xarray and netcdf files
-    :param out_file_name: name output netcdf file
-    :return: ncfile
-    """
-    ([sbmc_D00, sbmc_D25, sbmc_D50], [sbmi_D00, sbmi_D25, sbmi_D50]) = sim_run()
-    ds = xr.Dataset(
-        data_vars={
-            'sbmi_agents_size': (
-                ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'],
-                np.stack((sbmi_D00.agents_size, sbmi_D25.agents_size, sbmi_D50.agents_size))),
-            'sbmi_agents_biomass': (
-                ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'],
-                np.stack((sbmi_D00.agents_biomass, sbmi_D25.agents_biomass, sbmi_D50.agents_biomass))),
-            'sbmi_agents_abundance': (
-                ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'],
-                np.stack((sbmi_D00.agents_abundance, sbmi_D25.agents_abundance, sbmi_D50.agents_abundance))),
-            'sbmi_agents_growth': (
-                ['exp_num', 'spp_num', 'time_sbmi', 'num_agents'],
-                np.stack((sbmi_D00.agents_growth, sbmi_D25.agents_growth, sbmi_D50.agents_growth))),
-            'sbmi_resource':
-                (['exp_num', 'time_sbmi'],
-                 np.stack((sbmi_D00.resource, sbmi_D25.resource, sbmi_D50.resource))),
-            'sbmi_tot_abundance':
-                (['exp_num', 'time_sbmi'],
-                 np.stack((sbmi_D00.abundance, sbmi_D25.abundance, sbmi_D50.abundance))),
-            'sbmi_tot_biomass':
-                (['exp_num', 'time_sbmi'],
-                 np.stack((sbmi_D00.biomass, sbmi_D25.biomass, sbmi_D50.biomass))),
-            'sbmi_tot_quota':
-                (['exp_num', 'time_sbmi'],
-                 np.stack((sbmi_D00.quota, sbmi_D25.quota, sbmi_D50.quota))),
-            'sbmi_massbalance':
-                (['exp_num', 'time_sbmi'],
-                 np.stack((sbmi_D00.massbalance, sbmi_D25.massbalance, sbmi_D50.massbalance))),
-            'sbmc_size':
-                (['exp_num', 'idx_num_sc'],
-                 np.stack((sbmc_D00._size_range, sbmc_D25._size_range, sbmc_D50._size_range))),
-            'sbmc_biomass':
-                (['exp_num', 'time_sbmc', 'idx_num_sc'],
-                 np.stack((sbmc_D00.biomass, sbmc_D25.biomass, sbmc_D50.biomass))),
-            'sbmc_abundance':
-                (['exp_num', 'time_sbmc', 'idx_num_sc'],
-                 np.stack((sbmc_D00.abundance, sbmc_D25.abundance, sbmc_D50.abundance))),
-            'sbmc_quota':
-                (['exp_num', 'time_sbmc', 'idx_num_sc'],
-                 np.stack((sbmc_D00.quota, sbmc_D25.quota, sbmc_D50.quota))),
-            'sbmc_growth':
-                (['exp_num', 'time_sbmc', 'idx_num_sc'],
-                 np.stack((sbmc_D00.mus, sbmc_D25.mus, sbmc_D50.mus))),
-            'sbmc_resource':
-                (['exp_num', 'time_sbmc'],
-                 np.stack((sbmc_D00.resource, sbmc_D25.resource, sbmc_D50.resource)))
-        },
-        coords={'exp_num': np.arange(3),
-                'exp_name': (['exp_num'], ['D00', 'D25', 'D50']),
-                'spp_num': np.arange(2),
-                'spp_name_short': (['exp_num', 'spp_num'],
-                                   np.stack((sbmc_D00._spp_names, sbmc_D25._spp_names, sbmc_D50._spp_names))),
-                'time_sbmi': sbmi_D00.time,
-                'time_sbmc': sbmc_D00.time,
-                'num_agents': np.arange(2000),
-                'idx_num_sc': np.arange(20)
-                },
-        attrs={'title': 'Ss and Mp dilution experiments',
-               'description': 'Experiments for a combination of Ss and Mp species' +
-                              'Using two size-based model types ' +
-                              'based on size classes (SBMc) and' +
-                              'based on individuals (SBMi).',
-               'simulations setup': 'relative size range: 25%' +
-                                    ', dilution rates: 0%, 25% and 50%' +
-                                    ', volume: 1 Litre' +
-                                    ', maximum time of simulations: 20 days' +
-                                    ', maximum number of size classes: 10'
-                                    ', maximum number of agents: 1000',
-               'time_units': 'd (days)',
-               'size_units': 'um^3 (cubic micrometers)',
-               'biomass_units': 'mol C / cell (mol of carbon per cell)',
-               'abundance_units': 'cell / L (cells per litre)',
-               'quota_units': 'mol N / mol C * cell (mol of nitrogen per mol of carbon per cell)',
-               'growth_units': '1 / day (per day)',
-               'resource_units': 'uM N (micro Molar of nitrogen)'
-               }
-    )
-    ds.to_netcdf(path=out_file_name)
-    return ds
 
 
 def temporal_dynamics_plot():
@@ -421,33 +314,6 @@ def distribution_plot():
     ds_sbmi_asyn = xr.open_zarr(Ss_Mp_data_path + '/sbmi_asyn').to_dataframe()
     ds_sbmi_asyn.spp = ds_sbmi_asyn.spp.astype('category').cat.reorder_categories(['Ss', 'Mp'], ordered=True)
     cols = ['#5494aeff', '#7cb950ff']
-    # Reshape of data to plot size distributions of species
-    # dtf00 = pd.DataFrame({'cellsize': ds.sbmi_agents_size[0].values.flatten(),
-    #                       'abundance': ds.sbmi_agents_abundance[0].values.flatten(),
-    #                       'time': np.tile(np.repeat(ds.time_sbmi.values, ds.sbmi_agents_size[0].shape[-1]),
-    #                                       ds.sbmi_agents_size[0].shape[0]),
-    #                       'names': np.tile(np.repeat(ds.spp_name_short[0].values, ds.sbmi_agents_size[0].shape[-1]),
-    #                                        ds.sbmi_agents_size[0].shape[1])})
-    # dtf00['logcellsize'] = dtf00['cellsize'].transform(np.log10).values
-    # dtf00['logabundance'] = dtf00['abundance'].transform(np.log10).values
-    #
-    # dtf25 = pd.DataFrame({'cellsize': ds.sbmi_agents_size[1].values.flatten(),
-    #                       'abundance': ds.sbmi_agents_abundance[1].values.flatten(),
-    #                       'time': np.tile(np.repeat(ds.time_sbmi.values, ds.sbmi_agents_size[1].shape[-1]),
-    #                                       ds.sbmi_agents_size[1].shape[0]),
-    #                       'names': np.tile(np.repeat(ds.spp_name_short[1].values, ds.sbmi_agents_size[1].shape[-1]),
-    #                                        ds.sbmi_agents_size[1].shape[1])})
-    # dtf25['logcellsize'] = dtf25['cellsize'].transform(np.log10).values
-    # dtf25['logabundance'] = dtf25['abundance'].transform(np.log10).values
-    #
-    # dtf50 = pd.DataFrame({'cellsize': ds.sbmi_agents_size[2].values.flatten(),
-    #                       'abundance': ds.sbmi_agents_abundance[2].values.flatten(),
-    #                       'time': np.tile(np.repeat(ds.time_sbmi.values, ds.sbmi_agents_size[2].shape[-1]),
-    #                                       ds.sbmi_agents_size[2].shape[0]),
-    #                       'names': np.tile(np.repeat(ds.spp_name_short[2].values, ds.sbmi_agents_size[2].shape[-1]),
-    #                                        ds.sbmi_agents_size[2].shape[1])})
-    # dtf50['logcellsize'] = dtf50['cellsize'].transform(np.log10).values
-    # dtf50['logabundance'] = dtf50['abundance'].transform(np.log10).values
 
     fig = plt.figure(figsize=(10, 8))
     gs0 = gridspec.GridSpec(2, 1, hspace=0.20, figure=fig)
@@ -579,3 +445,10 @@ def distribution_plot():
                            Patch(facecolor=cols[1], edgecolor='black', label='Mp')]
     ax6.legend(handles=legend_elements_ax1, ncol=2, bbox_to_anchor=(0, 1, 1, 0), loc='upper right')
     fig.savefig('Ss_Mp_size_distribution.png', dpi=600)
+
+
+if __name__ == "__main__":
+    sim_run()
+    temporal_dynamics_plot()
+    spp_weights_plot()
+    distribution_plot()
