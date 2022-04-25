@@ -814,39 +814,3 @@ class SBMi_asyn(SBMbase):
                 printtime += self._dtp
                 indexpt += 1
             simtime += self._dt  # increase simulation time by one time step (fraction of a day)
-
-
-def _model_run(mtype,
-               ini_resource=0.0002, ini_density=(1e4, 1e4), min_size=(1.5e1, 1.5e4), max_size=(2.5e1, 2.5e4),
-               spp_names=('Aa', 'Bb'), dilution_rate=0.0, volume=1.0, nsi_spp=(100, 100), nsi_min=100,
-               nsi_max=1000, num_sc=(100, 100), time_end=10):
-    if mtype == 'sbmi_syn':
-        return SBMi_syn(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
-                        max_cell_size=max_size, spp_names=spp_names, dilution_rate=dilution_rate,
-                        volume=volume, nsi_spp=nsi_spp, nsi_min=nsi_min,
-                        nsi_max=nsi_max, time_end=time_end)
-    elif mtype == 'sbmi_asyn':
-        return SBMi_asyn(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
-                         max_cell_size=max_size, spp_names=spp_names, dilution_rate=dilution_rate,
-                         volume=volume, nsi_spp=nsi_spp, nsi_min=nsi_min,
-                         nsi_max=nsi_max, time_end=time_end)
-    elif mtype == 'sbmc':
-        return SBMc(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
-                    max_cell_size=max_size, spp_names=spp_names, dilution_rate=dilution_rate,
-                    volume=volume, num_sc=num_sc, time_end=time_end)
-
-    else:
-        raise ValueError("mtype must be a string specifying the name of the "
-                         "size model type, either: sbmc, sbmi_syn, sbmi_asyn. "
-                         "Instead got {!r}".format(mtype))
-
-
-"""
-benchmarking results for size-based models on 11.02.22
-%timeit _model_run('sbmc')
-39.7 ms ± 2.03 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
-%timeit _model_run('sbmi_syn')
-3.74 s ± 30.9 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-%timeit _model_run('sbmi_asyn')
-9.07 s ± 833 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-"""

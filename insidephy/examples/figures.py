@@ -10,6 +10,7 @@ from matplotlib.patches import Rectangle
 from matplotlib.collections import PatchCollection
 import matplotlib.lines as mlines
 from insidephy.size_based_models.trait_metrics import size_var_comp_sbmi
+from insidephy.size_based_models.sbm import SBMc, SBMi_asyn, SBMi_syn
 
 
 def figure1():
@@ -558,27 +559,28 @@ def figure7():
                                 'ini_size': np.repeat('75percent', 231)})
 
     cmap = plt.get_cmap('bone')
+    frac = 1 / 2
     fig, axs = plt.subplots(4, 1, sharex='col', figsize=(12, 6))
     var_means00.plot(kind='bar', stacked=True, color=[cmap(3 / 10), cmap(7 / 10)], ylim=(0, 1), ax=axs[0]).legend(
         loc='upper left')
     var_means25.plot(kind='bar', stacked=True, color=[cmap(3 / 10), cmap(7 / 10)], ylim=(0, 1), ax=axs[1], legend=False)
     var_means50.plot(kind='bar', stacked=True, color=[cmap(3 / 10), cmap(7 / 10)], ylim=(0, 1), ax=axs[2], legend=False)
     var_means75.plot(kind='bar', stacked=True, color=[cmap(3 / 10), cmap(7 / 10)], ylim=(0, 1), ax=axs[3], legend=False)
-    axs[0].hlines(y=[2 / 3], xmin=0, xmax=231, linestyles='dashed', colors='red')
-    axs[0].text(x=215, y=0.1 + 2 / 3,
-                s=str(np.round(100 * np.sum(var_means00.Intraspecific > 2 / 3) / 231, decimals=1)).zfill(1) + '%',
+    axs[0].hlines(y=[frac], xmin=0, xmax=231, linestyles='dashed', colors='red')
+    axs[0].text(x=215, y=0.1 + frac,
+                s=str(np.round(100 * np.sum(var_means00.Intraspecific > frac) / 231, decimals=1)).zfill(1) + '%',
                 c='red')
-    axs[1].hlines(y=[2 / 3], xmin=0, xmax=231, linestyles='dashed', colors='red')
-    axs[1].text(x=215, y=0.1 + 2 / 3,
-                s=str(np.round(100 * np.sum(var_means25.Intraspecific > 2 / 3) / 231, decimals=1)).zfill(1) + '%',
+    axs[1].hlines(y=[frac], xmin=0, xmax=231, linestyles='dashed', colors='red')
+    axs[1].text(x=215, y=0.1 + frac,
+                s=str(np.round(100 * np.sum(var_means25.Intraspecific > frac) / 231, decimals=1)).zfill(1) + '%',
                 c='red')
-    axs[2].hlines(y=[2 / 3], xmin=0, xmax=231, linestyles='dashed', colors='red')
-    axs[2].text(x=215, y=0.1 + 2 / 3,
-                s=str(np.round(100 * np.sum(var_means50.Intraspecific > 2 / 3) / 231, decimals=1)).zfill(1) + '%',
+    axs[2].hlines(y=[frac], xmin=0, xmax=231, linestyles='dashed', colors='red')
+    axs[2].text(x=215, y=0.1 + frac,
+                s=str(np.round(100 * np.sum(var_means50.Intraspecific > frac) / 231, decimals=1)).zfill(1) + '%',
                 c='red')
-    axs[3].hlines(y=[2 / 3], xmin=0, xmax=231, linestyles='dashed', colors='red')
-    axs[3].text(x=215, y=0.1 + 2 / 3,
-                s=str(np.round(100 * np.sum(var_means75.Intraspecific > 2 / 3) / 231, decimals=1)).zfill(1) + '%',
+    axs[3].hlines(y=[frac], xmin=0, xmax=231, linestyles='dashed', colors='red')
+    axs[3].text(x=215, y=0.1 + frac,
+                s=str(np.round(100 * np.sum(var_means75.Intraspecific > frac) / 231, decimals=1)).zfill(1) + '%',
                 c='red')
     axs[3].set_xticks(np.arange(0, 231, 4))
     axs[3].set_xticks(np.arange(0, 231, 1), minor=True)
@@ -659,3 +661,127 @@ def figure8():
                 y='cell_size', x='spp', hue='model', order=ordered_key, ax=axs[3])
     axs[2].set_yscale('log')
     axs[3].set_yscale('log')
+
+
+def figure9():
+    sbm_data_path_000 = pkg_resources.resource_filename('insidephy.examples', 'Two_spp_exp_0percent.zarr')
+    sbmc_000 = xr.open_zarr(sbm_data_path_000 + '/sbmc').to_dataframe()
+    dtf_000 = sbmc_000.groupby(['exp', 'time']).apply(lambda x: size_var_comp_sbmi(x, 'abundance'))
+
+    sbm_data_path_025 = pkg_resources.resource_filename('insidephy.examples', 'Two_spp_exp_25percent.zarr')
+    sbmc_025 = xr.open_zarr(sbm_data_path_025 + '/sbmc').to_dataframe()
+    dtf_025 = sbmc_025.groupby(['exp', 'time']).apply(lambda x: size_var_comp_sbmi(x, 'abundance'))
+
+    sbm_data_path_050 = pkg_resources.resource_filename('insidephy.examples', 'Two_spp_exp_50percent.zarr')
+    sbmc_050 = xr.open_zarr(sbm_data_path_050 + '/sbmc').to_dataframe()
+    dtf_050 = sbmc_050.groupby(['exp', 'time']).apply(lambda x: size_var_comp_sbmi(x, 'abundance'))
+
+    sbm_data_path_075 = pkg_resources.resource_filename('insidephy.examples', 'Two_spp_exp_75percent.zarr')
+    sbmc_075 = xr.open_zarr(sbm_data_path_075 + '/sbmc').to_dataframe()
+    dtf_075 = sbmc_075.groupby(['exp', 'time']).apply(lambda x: size_var_comp_sbmi(x, 'abundance'))
+
+    var_means00 = pd.DataFrame({'Intraspecific': (dtf_000.within_var / dtf_000.tot_var).groupby('exp').mean(),
+                                'Interspecific': (dtf_000.between_var / dtf_000.tot_var).groupby('exp').mean(),
+                                'ini_size': np.repeat('00percent', 231)})
+
+    var_means25 = pd.DataFrame({'Intraspecific': (dtf_025.within_var / dtf_025.tot_var).groupby('exp').mean(),
+                                'Interspecific': (dtf_025.between_var / dtf_025.tot_var).groupby('exp').mean(),
+                                'ini_size': np.repeat('25percent', 231)})
+
+    var_means50 = pd.DataFrame({'Intraspecific': (dtf_050.within_var / dtf_050.tot_var).groupby('exp').mean(),
+                                'Interspecific': (dtf_050.between_var / dtf_050.tot_var).groupby('exp').mean(),
+                                'ini_size': np.repeat('50percent', 231)})
+
+    var_means75 = pd.DataFrame({'Intraspecific': (dtf_075.within_var / dtf_075.tot_var).groupby('exp').mean(),
+                                'Interspecific': (dtf_075.between_var / dtf_075.tot_var).groupby('exp').mean(),
+                                'ini_size': np.repeat('75percent', 231)})
+
+    cmap = plt.get_cmap('bone')
+    frac = 1/2
+    fig, axs = plt.subplots(4, 1, sharex='col', figsize=(12, 6))
+    var_means00.plot(kind='bar', stacked=True, color=[cmap(3 / 10), cmap(7 / 10)], ylim=(0, 1), ax=axs[0]).legend(
+        loc='upper left')
+    var_means25.plot(kind='bar', stacked=True, color=[cmap(3 / 10), cmap(7 / 10)], ylim=(0, 1), ax=axs[1], legend=False)
+    var_means50.plot(kind='bar', stacked=True, color=[cmap(3 / 10), cmap(7 / 10)], ylim=(0, 1), ax=axs[2], legend=False)
+    var_means75.plot(kind='bar', stacked=True, color=[cmap(3 / 10), cmap(7 / 10)], ylim=(0, 1), ax=axs[3], legend=False)
+    axs[0].hlines(y=[frac], xmin=0, xmax=231, linestyles='dashed', colors='red')
+    axs[0].text(x=215, y=0.1 + frac,
+                s=str(np.round(100 * np.sum(var_means00.Intraspecific > frac) / 231, decimals=1)).zfill(1) + '%',
+                c='red')
+    axs[1].hlines(y=[frac], xmin=0, xmax=231, linestyles='dashed', colors='red')
+    axs[1].text(x=215, y=0.1 + frac,
+                s=str(np.round(100 * np.sum(var_means25.Intraspecific > frac) / 231, decimals=1)).zfill(1) + '%',
+                c='red')
+    axs[2].hlines(y=[frac], xmin=0, xmax=231, linestyles='dashed', colors='red')
+    axs[2].text(x=215, y=0.1 + frac,
+                s=str(np.round(100 * np.sum(var_means50.Intraspecific > frac) / 231, decimals=1)).zfill(1) + '%',
+                c='red')
+    axs[3].hlines(y=[frac], xmin=0, xmax=231, linestyles='dashed', colors='red')
+    axs[3].text(x=215, y=0.1 + frac,
+                s=str(np.round(100 * np.sum(var_means75.Intraspecific > frac) / 231, decimals=1)).zfill(1) + '%',
+                c='red')
+    axs[3].set_xticks(np.arange(0, 231, 4))
+    axs[3].set_xticks(np.arange(0, 231, 1), minor=True)
+    fig.text(0.075, 0.125, 'Proportion of components to total size variability ', size=12, weight='bold', rotation=90)
+    fig.text(0.93, 0.25, 'Initial relative size variability [-]', size=12, weight='bold', rotation=270,
+             horizontalalignment='center')
+    fig.text(0.91, 0.76, '0%', size=12, weight='bold', rotation=270, horizontalalignment='center')
+    fig.text(0.91, 0.56, '25%', size=12, weight='bold', rotation=270, horizontalalignment='center')
+    fig.text(0.91, 0.36, '50%', size=12, weight='bold', rotation=270, horizontalalignment='center')
+    fig.text(0.91, 0.16, '75%', size=12, weight='bold', rotation=270, horizontalalignment='center')
+    fig.savefig('Inter_intra_size_var_sbmc.png', dpi=600)
+
+
+def model_benchmarking(mtype,
+                      ini_resource=0.0002, ini_density=(1e4, 1e4), min_size=(1.5e1, 1.5e4), max_size=(2.5e1, 2.5e4),
+                      spp_names=('Aa', 'Bb'), dilution_rate=0.0, volume=1.0, nsi_spp=(100, 100), nsi_min=100,
+                      nsi_max=1000, num_sc=(100, 100), time_end=10):
+    if mtype == 'sbmi_syn':
+        SBMi_syn(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
+                 max_cell_size=max_size, spp_names=spp_names, dilution_rate=dilution_rate,
+                 volume=volume, nsi_spp=nsi_spp, nsi_min=nsi_min,
+                 nsi_max=nsi_max, time_end=time_end)
+    elif mtype == 'sbmi_asyn':
+        SBMi_asyn(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
+                  max_cell_size=max_size, spp_names=spp_names, dilution_rate=dilution_rate,
+                  volume=volume, nsi_spp=nsi_spp, nsi_min=nsi_min,
+                  nsi_max=nsi_max, time_end=time_end)
+    elif mtype == 'sbmc':
+        SBMc(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
+             max_cell_size=max_size, spp_names=spp_names, dilution_rate=dilution_rate,
+             volume=volume, num_sc=num_sc, time_end=time_end)
+    else:
+        raise ValueError("mtype must be a string specifying the name of the "
+                         "size model type, either: sbmc, sbmi_syn, sbmi_asyn. "
+                         "Instead got {!r}".format(mtype))
+
+    """
+    Benchmarking results for size-based models on 23.04.22
+    Model based on size classes 
+      %timeit model_benchmarking('sbmc', min_size=(2e1, 2e4), max_size=(2e1, 2e4), num_sc=(1, 1))
+      18.8 ms ± 824 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
+      %timeit model_benchmarking('sbmc', num_sc=(10, 10))
+      21.8 ms ± 1.55 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
+      %timeit model_benchmarking('sbmc', num_sc=(100, 100))
+      36.1 ms ± 1.1 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
+      %timeit model_benchmarking('sbmc', num_sc=(1000, 1000))
+      237 ms ± 12.2 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+    Model based on individuals with asynchronous updating
+      %timeit model_benchmarking('sbmi_asyn', nsi_min=10,nsi_max=100)
+      367 ms ± 11.3 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+      %timeit model_benchmarking('sbmi_asyn', nsi_min=100,nsi_max=1000)
+      7.1 s ± 563 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+      %timeit model_benchmarking('sbmi_asyn', nsi_min=500,nsi_max=5000)
+      1min 18s ± 1.47 s per loop (mean ± std. dev. of 7 runs, 1 loop each)
+      %timeit model_benchmarking('sbmi_asyn', nsi_min=1000,nsi_max=10000)
+      4min 51s ± 1.61 s per loop (mean ± std. dev. of 7 runs, 1 loop each)
+    Model based on individuals with synchronous updating
+      %timeit model_benchmarking('sbmi_syn', nsi_min=10,nsi_max=100)
+      1.55 s ± 12.4 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+      %timeit model_benchmarking('sbmi_syn', nsi_min=100,nsi_max=1000)
+      3.6 s ± 231 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+      %timeit model_benchmarking('sbmi_syn', nsi_min=500,nsi_max=5000)
+      16 s ± 135 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+      %timeit model_benchmarking('sbmi_syn', nsi_min=1000,nsi_max=10000)
+      32.5 s ± 2.2 s per loop (mean ± std. dev. of 7 runs, 1 loop each)
+    """

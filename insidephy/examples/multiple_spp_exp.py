@@ -118,7 +118,7 @@ if __name__ == "__main__":
                       sbmc_variant=True, sbmi_asyn_variant=True, outfname_base='Two_spp_exp_0percent')
     multiple_spp_sims(2, rel_size_range=0.25, sbmc_numsc=[10], sbmi_ts=0.01,
                       sbmc_variant=True, sbmi_asyn_variant=True, outfname_base='Two_spp_exp_25percent')
-    multiple_spp_sims(2, rel_size_range=0.50, sbmc_numsc=[1], sbmi_ts=0.01,
+    multiple_spp_sims(2, rel_size_range=0.50, sbmc_numsc=[10], sbmi_ts=0.01,
                       sbmc_variant=True, sbmi_asyn_variant=True, outfname_base='Two_spp_exp_50percent')
     multiple_spp_sims(2, rel_size_range=0.75, sbmc_numsc=[10], sbmi_ts=0.01,
                       sbmc_variant=True, sbmi_asyn_variant=True, outfname_base='Two_spp_exp_75percent')

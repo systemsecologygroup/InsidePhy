@@ -233,5 +233,8 @@ def plots(dilution_rate=0.0):
     blackline = mlines.Line2D([], [], c='black', ls='--', lw=3.0)
     greyline = mlines.Line2D([], [], c='grey', lw=3.0)
     redline = mlines.Line2D([], [], c='red', lw=3.0)
-    axs1[0, 0].legend([blackline, redline, greyline], ['SBMc', 'SBMi_syn', 'SBMi_asyn'], loc='lower left')
-    fig1.savefig('MREG.png', dpi=600)
+    axs1[0, 0].legend([blackline, greyline, redline], ['SBMc', 'SBMi', 'SBMi-s', ], loc='lower left')
+    fig1.savefig('sbmi_syn_test.png', dpi=600)
+
+if __name__ == "__main__":
+    plots()
