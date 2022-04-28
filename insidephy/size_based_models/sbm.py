@@ -580,10 +580,12 @@ class SBMi_asyn(SBMbase):
     """
 
     def __init__(self, ini_resource, ini_density, spp_names, min_cell_size, max_cell_size, dilution_rate, volume,
-                 nsi_spp, nsi_min, nsi_max, time_end=20, time_step=1 / 24, print_time_step=1, random_seed=1234):
+                 nsi_spp, nsi_min, nsi_max, time_end=20, time_step=1 / 24, print_time_step=1, random_seed=1234,
+                 reproduction_random=False):
         super().__init__(ini_resource, ini_density, spp_names, min_cell_size, max_cell_size, dilution_rate, volume)
 
         self._rng = np.random.default_rng(random_seed)
+        self._reproduction_random = reproduction_random
         # Simulation parameters
         self._params = {
             'ini_resource': ini_resource,
@@ -756,7 +758,7 @@ class SBMi_asyn(SBMbase):
 
     def update(self):
         """
-        Method to update the state of all agent and resource
+        Method to asynchronous update the state of all agent and resource
         :return: updated agents and resource
         """
         pkeys = list(self._pdic.keys())
@@ -770,20 +772,36 @@ class SBMi_asyn(SBMbase):
             self._R -= self._pdic[randkey].massbalance * self._dt / self._params['volume']  # loss of R due to uptake
             #       = molN/molC*hour * molC/cell * cell/agent * hour/L
             #       = molN/L
-            if self._pdic[randkey].biomass > 2 * self._pdic[randkey].ini_biomass:  # Reproduction
-                halfbiomass = self._pdic[randkey].biomass * 0.5
-                halfquota = self._pdic[randkey].quota * self._pdic[randkey].biomass * 0.5 / halfbiomass
-                halfcellsize = self._pdic[randkey].cell_size * 0.5
-                self._pdic[randkey].biomass = halfbiomass  # set biomass to half biomass
-                self._pdic[randkey].quota = halfquota  # set quota to half quota
-                self._pdic[randkey].cell_size = halfcellsize  # set cell size to half cell size
-                maxpalive = np.max([int(key[2:]) for key in self._pdic.keys() if randkey[0:2] in key])
-                newpcellkey = randkey[0:2] + str(maxpalive + 1).zfill(5)  # key of new phytoplankton cell
-                # create new phytoplankton with half cell size, biomass and quota
-                self._pdic.update({newpcellkey: PhytoCell(init_biomass=halfbiomass, init_cell_size=halfcellsize,
-                                                          rep_nind=self._pdic[randkey].rep_nind,
-                                                          init_quota=halfquota)})  #
-                self._nsi_spp[spp_idx] += 1
+            if self._reproduction_random:  # Random reproduction
+                if self._rng.random() < self._pdic[randkey].mu * self._dt:
+                    halfbiomass = self._pdic[randkey].biomass * 0.5
+                    halfquota = self._pdic[randkey].quota * self._pdic[randkey].biomass * 0.5 / halfbiomass
+                    halfcellsize = self._pdic[randkey].cell_size * 0.5
+                    self._pdic[randkey].biomass = halfbiomass  # set biomass to half biomass
+                    self._pdic[randkey].quota = halfquota  # set quota to half quota
+                    self._pdic[randkey].cell_size = halfcellsize  # set cell size to half cell size
+                    maxpalive = np.max([int(key[2:]) for key in self._pdic.keys() if randkey[0:2] in key])
+                    newpcellkey = randkey[0:2] + str(maxpalive + 1).zfill(5)  # key of new phytoplankton cell
+                    # create new phytoplankton with half cell size, biomass and quota
+                    self._pdic.update({newpcellkey: PhytoCell(init_biomass=halfbiomass, init_cell_size=halfcellsize,
+                                                              rep_nind=self._pdic[randkey].rep_nind,
+                                                              init_quota=halfquota)})  #
+                    self._nsi_spp[spp_idx] += 1
+            else:  # Deterministic cell size reproduction
+                if self._pdic[randkey].biomass > 2 * self._pdic[randkey].ini_biomass:
+                    halfbiomass = self._pdic[randkey].biomass * 0.5
+                    halfquota = self._pdic[randkey].quota * self._pdic[randkey].biomass * 0.5 / halfbiomass
+                    halfcellsize = self._pdic[randkey].cell_size * 0.5
+                    self._pdic[randkey].biomass = halfbiomass  # set biomass to half biomass
+                    self._pdic[randkey].quota = halfquota  # set quota to half quota
+                    self._pdic[randkey].cell_size = halfcellsize  # set cell size to half cell size
+                    maxpalive = np.max([int(key[2:]) for key in self._pdic.keys() if randkey[0:2] in key])
+                    newpcellkey = randkey[0:2] + str(maxpalive + 1).zfill(5)  # key of new phytoplankton cell
+                    # create new phytoplankton with half cell size, biomass and quota
+                    self._pdic.update({newpcellkey: PhytoCell(init_biomass=halfbiomass, init_cell_size=halfcellsize,
+                                                              rep_nind=self._pdic[randkey].rep_nind,
+                                                              init_quota=halfquota)})  #
+                    self._nsi_spp[spp_idx] += 1
             if self._rng.random() < self._params[
                 'dilution_rate'] * self._dt:  # Mortality based on probability of being washout
                 maxpdead = len(pdead)
