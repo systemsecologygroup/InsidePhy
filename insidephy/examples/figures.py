@@ -10,7 +10,7 @@ from matplotlib.patches import Rectangle
 from matplotlib.collections import PatchCollection
 import matplotlib.lines as mlines
 from insidephy.size_based_models.trait_metrics import size_var_comp_sbmi
-from insidephy.size_based_models.sbm import SBMc, SBMi_asyn, SBMi_syn
+from insidephy.size_based_models.sbm import SBMc, SBMi_asyn
 
 
 def figure1():
@@ -75,7 +75,7 @@ def figure1():
     axs1[3, 5].text(5, 91, 'Cocco', weight='bold')
     axs1[3, 5].text(5, 121, 'Diatom', weight='bold')
     axs1[3, 5].text(5, 151, 'Dino', weight='bold')
-    fig1.text(0.05, 0.35, 'Resources [uM N]', rotation=90, size=12, weight='bold')
+    fig1.text(0.05, 0.35, 'Nutrients [uM N]', rotation=90, size=12, weight='bold')
     fig1.text(0.31, 0.025, 'Time [days]', size=12, weight='bold')
     fig1.text(0.655, 0.27, 'SBMc', size=8, weight='bold')
     fig1.text(0.725, 0.27, 'SBMi', size=8, weight='bold')
@@ -569,19 +569,19 @@ def figure7():
     axs[0].hlines(y=[frac], xmin=0, xmax=231, linestyles='dashed', colors='red')
     axs[0].text(x=215, y=0.1 + frac,
                 s=str(np.round(100 * np.sum(var_means00.Intraspecific > frac) / 231, decimals=1)).zfill(1) + '%',
-                c='red')
+                c='red', weight='bold')
     axs[1].hlines(y=[frac], xmin=0, xmax=231, linestyles='dashed', colors='red')
     axs[1].text(x=215, y=0.1 + frac,
                 s=str(np.round(100 * np.sum(var_means25.Intraspecific > frac) / 231, decimals=1)).zfill(1) + '%',
-                c='red')
+                c='red', weight='bold')
     axs[2].hlines(y=[frac], xmin=0, xmax=231, linestyles='dashed', colors='red')
     axs[2].text(x=215, y=0.1 + frac,
                 s=str(np.round(100 * np.sum(var_means50.Intraspecific > frac) / 231, decimals=1)).zfill(1) + '%',
-                c='red')
+                c='red', weight='bold')
     axs[3].hlines(y=[frac], xmin=0, xmax=231, linestyles='dashed', colors='red')
     axs[3].text(x=215, y=0.1 + frac,
                 s=str(np.round(100 * np.sum(var_means75.Intraspecific > frac) / 231, decimals=1)).zfill(1) + '%',
-                c='red')
+                c='red', weight='bold')
     axs[3].set_xticks(np.arange(0, 231, 4))
     axs[3].set_xticks(np.arange(0, 231, 1), minor=True)
     fig.text(0.075, 0.125, 'Proportion of components to total size variability ', size=12, weight='bold', rotation=90)
@@ -597,73 +597,6 @@ def figure7():
 
 
 def figure8():
-    maranon_data_path = pkg_resources.resource_filename('insidephy.data', 'maranon_2013EcoLet_data.h5')
-    cultures = pd.read_hdf(maranon_data_path, 'batchdtf')
-    cultures['spp'] = cultures['Species'].apply(lambda x: x[0] + x[search('_', x).span()[1]])
-    culbyspp = cultures.groupby(['Species'], observed=True)
-    ordered_key = [key[0] + key[search('_', key).span()[1]] for key in culbyspp.groups.keys()]
-
-    sbm_data_path = pkg_resources.resource_filename('insidephy.examples', 'Single_spp_exp_0percent.zarr')
-    sbmc = xr.open_zarr(sbm_data_path + '/sbmc').to_dataframe()
-    sbmi = xr.open_zarr(sbm_data_path + '/sbmi_asyn').to_dataframe()
-
-    resource = pd.concat([sbmc[['resource', 'spp']].rename(columns={'resource': 'SBMc'}),
-                          sbmi[['resource', 'spp']].rename(columns={'resource': 'SBMi'}),
-                          cultures[['NO3_uM', 'spp']].rename(columns={'NO3_uM': 'Obs'})],
-                         keys='spp', ignore_index=True)
-    resource['SBMc'] = resource['SBMc'] * 1e6
-    resource['SBMi'] = resource['SBMi'] * 1e6
-    resource = resource.set_index('spp').stack().rename('resource')
-    resource.index.rename(['spp', 'model'], inplace=True)
-
-    sbmc_quota = sbmc.groupby(['spp', 'time']).apply(lambda x: np.sum(x.quota * x.abundance) * 1e6).rename(
-        "SBMc").reset_index()
-    sbmi_quota = sbmi.groupby(['spp', 'time']).quota.sum().rename("SBMi").reset_index()
-
-    PON = pd.concat([sbmc_quota[['spp', 'SBMc']], sbmi_quota[['spp', 'SBMi']],
-                     cultures[['PON_ugNmL', 'spp']].rename(columns={'PON_ugNmL': 'Obs'})],
-                    keys='spp', ignore_index=True)
-    PON['Obs'] = PON['Obs'] * 1 / 14.007 * 1e3 / 1
-    PON['SBMi'] = PON['SBMi'] * 1e6
-    PON = PON.set_index('spp').stack().rename('PON')
-    PON.index.rename(['spp', 'model'], inplace=True)
-
-    sbmc_abund = sbmc.groupby(['spp', 'time']).apply(lambda x: np.sum(x.abundance)).rename("SBMc").reset_index()
-    sbmi_abund = sbmi.groupby(['spp', 'time']).rep_nind.sum().rename("SBMi").reset_index()
-    abundance = pd.concat([sbmc_abund[['spp', 'SBMc']], sbmi_abund[['spp', 'SBMi']],
-                           cultures[['Abun_cellmL', 'spp']].rename(columns={'Abun_cellmL': 'Obs'})],
-                          keys='spp', ignore_index=True)
-    abundance['Obs'] = abundance['Obs'] * 1e3
-    abundance = abundance.set_index('spp').stack().rename('abundance')
-    abundance.index.rename(['spp', 'model'], inplace=True)
-
-    sizedtf = pd.read_hdf(maranon_data_path, 'sizedtf')
-    sizedtf['spp'] = sizedtf['Species'].apply(lambda x: x[0] + x[search('_', x).span()[1]])
-
-    sbmc_size = sbmc.groupby(['spp', 'time']).apply(lambda x: np.average(x.cell_size, weights=x.abundance)).rename(
-        "SBMc").reset_index()
-    sbmi_size = sbmi.groupby(['spp', 'time']).apply(lambda x: np.average(x.cell_size, weights=x.rep_nind)).rename(
-        "SBMi").reset_index()
-    cell_size = pd.concat([sbmc_size[['spp', 'SBMc']], sbmi_size[['spp', 'SBMi']],
-                           sizedtf[['Vcell', 'spp']].rename(columns={'Vcell': 'Obs'})],
-                          keys='spp', ignore_index=True)
-    cell_size = cell_size.set_index('spp').stack().rename('cell_size')
-    cell_size.index.rename(['spp', 'model'], inplace=True)
-
-    fig, axs = plt.subplots(4, 1, sharex='col', figsize=(12, 8))
-    sns.boxplot(data=resource.loc[resource > 1e0].reset_index(), whis=[0, 100],
-                y='resource', x='spp', hue='model', order=ordered_key, ax=axs[0])
-    sns.boxplot(data=PON.reset_index(), whis=[0, 100],
-                y='PON', x='spp', hue='model', order=ordered_key, ax=axs[1])
-    sns.boxplot(data=abundance.reset_index(), whis=[0, 100],
-                y='abundance', x='spp', hue='model', order=ordered_key, ax=axs[2])
-    sns.boxplot(data=cell_size.reset_index(), whis=[0, 100],
-                y='cell_size', x='spp', hue='model', order=ordered_key, ax=axs[3])
-    axs[2].set_yscale('log')
-    axs[3].set_yscale('log')
-
-
-def figure9():
     sbm_data_path_000 = pkg_resources.resource_filename('insidephy.examples', 'Two_spp_exp_0percent.zarr')
     sbmc_000 = xr.open_zarr(sbm_data_path_000 + '/sbmc').to_dataframe()
     dtf_000 = sbmc_000.groupby(['exp', 'time']).apply(lambda x: size_var_comp_sbmi(x, 'abundance'))
@@ -697,7 +630,7 @@ def figure9():
                                 'ini_size': np.repeat('75percent', 231)})
 
     cmap = plt.get_cmap('bone')
-    frac = 1/2
+    frac = 1 / 2
     fig, axs = plt.subplots(4, 1, sharex='col', figsize=(12, 6))
     var_means00.plot(kind='bar', stacked=True, color=[cmap(3 / 10), cmap(7 / 10)], ylim=(0, 1), ax=axs[0]).legend(
         loc='upper left')
@@ -707,19 +640,19 @@ def figure9():
     axs[0].hlines(y=[frac], xmin=0, xmax=231, linestyles='dashed', colors='red')
     axs[0].text(x=215, y=0.1 + frac,
                 s=str(np.round(100 * np.sum(var_means00.Intraspecific > frac) / 231, decimals=1)).zfill(1) + '%',
-                c='red')
+                c='red', weight='bold')
     axs[1].hlines(y=[frac], xmin=0, xmax=231, linestyles='dashed', colors='red')
     axs[1].text(x=215, y=0.1 + frac,
                 s=str(np.round(100 * np.sum(var_means25.Intraspecific > frac) / 231, decimals=1)).zfill(1) + '%',
-                c='red')
+                c='red', weight='bold')
     axs[2].hlines(y=[frac], xmin=0, xmax=231, linestyles='dashed', colors='red')
     axs[2].text(x=215, y=0.1 + frac,
                 s=str(np.round(100 * np.sum(var_means50.Intraspecific > frac) / 231, decimals=1)).zfill(1) + '%',
-                c='red')
+                c='red', weight='bold')
     axs[3].hlines(y=[frac], xmin=0, xmax=231, linestyles='dashed', colors='red')
     axs[3].text(x=215, y=0.1 + frac,
                 s=str(np.round(100 * np.sum(var_means75.Intraspecific > frac) / 231, decimals=1)).zfill(1) + '%',
-                c='red')
+                c='red', weight='bold')
     axs[3].set_xticks(np.arange(0, 231, 4))
     axs[3].set_xticks(np.arange(0, 231, 1), minor=True)
     fig.text(0.075, 0.125, 'Proportion of components to total size variability ', size=12, weight='bold', rotation=90)
@@ -732,31 +665,157 @@ def figure9():
     fig.savefig('Inter_intra_size_var_sbmc.png', dpi=600)
 
 
+def figure9(ini_resource=0.0002, ini_density=(1e4, 1e4), min_size=(1.5e1, 1.5e4), max_size=(2.5e1, 2.5e4),
+             spp_names=('Aa', 'Bb'), dilution_rate=0.0, volume=1.0, nsi_spp=(500, 500), nsi_min=100,
+             nsi_max=1900, num_sc=(50, 50), time_end=30, time_step=1/24, print_time_step=1):
+    sbmc = SBMc(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
+                max_cell_size=max_size,
+                spp_names=spp_names, num_sc=num_sc, time_end=time_end,
+                dilution_rate=dilution_rate, volume=volume)
+    sbmi = SBMi_asyn(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
+                     max_cell_size=max_size,
+                     spp_names=spp_names, nsi_spp=nsi_spp, nsi_min=nsi_min, nsi_max=nsi_max,
+                     volume=volume,
+                     time_step=time_step, time_end=time_end, print_time_step=print_time_step,
+                     dilution_rate=dilution_rate)
+    cols = ['#5494aeff', '#7cb950ff']
+
+    fig1, axs1 = plt.subplots(5, 3, sharex='col', sharey='row', figsize=(10, 8))
+    # Resources plots
+    axs1[0, 0].plot(sbmc.dtf.groupby('time').time.first(),
+                    sbmc.dtf.groupby('time').resource.first() * 1e3, c='black', ls='--', lw=3.0, alpha=0.9)
+    axs1[0, 0].plot(sbmi.dtf.time.unique(),
+                    sbmi.dtf.groupby('time').resource.first() * 1e3, c='grey', lw=3.0, alpha=0.5)
+
+    # Quota plots
+    axs1[1, 0].plot(sbmc.dtf.groupby('time').time.first(),
+                    sbmc.dtf.groupby('time').apply(lambda x: np.sum(x.quota * x.abundance) * 1e3),
+                    c='black', ls='--', lw=3.0, alpha=0.9)
+    axs1[1, 1].plot(sbmc.dtf.groupby('time').time.first(),
+                    sbmc.dtf.groupby(['time', 'spp']).apply(lambda x: np.sum(x.quota * x.abundance) * 1e3).loc[:, 'Aa'],
+                    c='black', ls='--', lw=3.0, alpha=0.9)
+    axs1[1, 2].plot(sbmc.dtf.groupby('time').time.first(),
+                    sbmc.dtf.groupby(['time', 'spp']).apply(lambda x: np.sum(x.quota * x.abundance) * 1e3).loc[:, 'Bb'],
+                    c='black', ls='--', lw=3.0, alpha=0.9)
+    axs1[1, 0].plot(sbmi.dtf.time.unique(),
+                    sbmi.dtf.groupby('time').quota.sum() * 1e3,
+                    c='grey', lw=3.0, alpha=0.5)
+    axs1[1, 1].plot(sbmi.dtf.time.unique(),
+                    sbmi.dtf.groupby(['time', 'spp']).quota.sum().loc[:, 'Aa'] * 1e3,
+                    c='grey', lw=3.0, alpha=0.5)
+    axs1[1, 2].plot(sbmi.dtf.time.unique(),
+                    sbmi.dtf.groupby(['time', 'spp']).quota.sum().loc[:, 'Bb'] * 1e3,
+                    c='grey', lw=3.0, alpha=0.5)
+
+    # Abundance plots
+    axs1[2, 0].plot(sbmc.dtf.groupby('time').time.first(),
+                    sbmc.dtf.groupby('time').apply(lambda x: np.sum(x.abundance)),
+                    c='black', ls='--', lw=3.0, alpha=0.9)
+    axs1[2, 1].plot(sbmc.dtf.groupby('time').time.first(),
+                    sbmc.dtf.groupby(['time', 'spp']).apply(lambda x: np.sum(x.abundance)).loc[:, 'Aa'],
+                    c='black', ls='--', lw=3.0, alpha=0.9)
+    axs1[2, 2].plot(sbmc.dtf.groupby('time').time.first(),
+                    sbmc.dtf.groupby(['time', 'spp']).apply(lambda x: np.sum(x.abundance)).loc[:, 'Bb'],
+                    c='black', ls='--', lw=3.0, alpha=0.9)
+    axs1[2, 0].plot(sbmi.dtf.time.unique(),
+                    sbmi.dtf.groupby('time').rep_nind.sum(), c='grey', lw=3.0, alpha=0.5)
+    axs1[2, 1].plot(sbmi.dtf.time.unique(),
+                    sbmi.dtf.groupby(['time', 'spp']).rep_nind.sum().loc[:, 'Aa'], c='grey', lw=3.0, alpha=0.5)
+    axs1[2, 2].plot(sbmi.dtf.time.unique(),
+                    sbmi.dtf.groupby(['time', 'spp']).rep_nind.sum().loc[:, 'Bb'], c='grey', lw=3.0, alpha=0.5)
+
+    # Biomass plots
+    axs1[3, 0].plot(sbmc.dtf.groupby('time').time.first(),
+                    sbmc.dtf.groupby('time').apply(lambda x: np.sum(x.biomass)),
+                    c='black', ls='--', lw=3.0, alpha=0.9)
+    axs1[3, 1].plot(sbmc.dtf.groupby('time').time.first(),
+                    sbmc.dtf.groupby(['time', 'spp']).apply(lambda x: np.sum(x.biomass)).loc[:, 'Aa'],
+                    c='black', ls='--', lw=3.0, alpha=0.9)
+    axs1[3, 2].plot(sbmc.dtf.groupby('time').time.first(),
+                    sbmc.dtf.groupby(['time', 'spp']).apply(lambda x: np.sum(x.biomass)).loc[:, 'Bb'],
+                    c='black', ls='--', lw=3.0, alpha=0.9)
+    axs1[3, 0].plot(sbmi.dtf.groupby('time').time.first(),
+                    sbmi.dtf.groupby('time').biomass.sum(),
+                    c='grey', lw=3.0, alpha=0.5)
+    axs1[3, 1].plot(sbmi.dtf.groupby('time').time.first(),
+                    sbmi.dtf.groupby(['time', 'spp']).biomass.sum().loc[:, 'Aa'],
+                    c='grey', lw=3.0, alpha=0.5)
+    axs1[3, 2].plot(sbmi.dtf.groupby('time').time.first(),
+                    sbmi.dtf.groupby(['time', 'spp']).biomass.sum().loc[:, 'Bb'],
+                    c='grey', lw=3.0, alpha=0.5)
+
+    # Mean cell size plots
+    axs1[4, 0].plot(sbmc.dtf.groupby('time').time.first(),
+                    sbmc.dtf.groupby('time').apply(lambda x: np.sum(x.cell_size * x.abundance) / np.sum(x.abundance)),
+                    c='black', ls='--', lw=3.0, alpha=0.9)
+    axs1[4, 1].plot(sbmc.dtf.groupby('time').time.first(),
+                    sbmc.dtf.groupby(['time', 'spp']).apply(
+                        lambda x: np.sum(x.cell_size * x.abundance) / np.sum(x.abundance)).loc[:, 'Aa'],
+                    c='black', ls='--', lw=3.0, alpha=0.9)
+    axs1[4, 2].plot(sbmc.dtf.groupby('time').time.first(),
+                    sbmc.dtf.groupby(['time', 'spp']).apply(
+                        lambda x: np.sum(x.cell_size * x.abundance) / np.sum(x.abundance)).loc[:, 'Bb'],
+                    c='black', ls='--', lw=3.0, alpha=0.9)
+    axs1[4, 0].plot(sbmi.dtf.time.unique(),
+                    sbmi.dtf.groupby('time').apply(lambda x: np.sum(x.cell_size * x.rep_nind) / np.sum(x.rep_nind)),
+                    c='grey', lw=3.0, alpha=0.5)
+    axs1[4, 1].plot(sbmi.dtf.time.unique(),
+                    sbmi.dtf.groupby(['time', 'spp']).apply(lambda x: np.sum(x.cell_size * x.rep_nind) /
+                                                                      np.sum(x.rep_nind)).loc[:, 'Aa'],
+                    c='grey', lw=3.0, alpha=0.5)
+    axs1[4, 2].plot(sbmi.dtf.time.unique(),
+                    sbmi.dtf.groupby(['time', 'spp']).apply(lambda x: np.sum(x.cell_size * x.rep_nind) /
+                                                                      np.sum(x.rep_nind)).loc[:, 'Bb'],
+                    c='grey', lw=3.0, alpha=0.5)
+
+    # customization
+    axs1[2, 0].set_yscale('log')
+    axs1[3, 0].set_yscale('log')
+    axs1[4, 0].set_yscale('log')
+    axs1[0, 0].set_xlim(0, 30)
+    axs1[0, 1].set_xlim(0, 30)
+    axs1[0, 2].set_xlim(0, 30)
+    axs1[0, 1].axis('off')
+    axs1[0, 2].axis('off')
+    axs1[0, 0].set_title("Total", weight='bold')
+    axs1[1, 1].set_title("Aa", weight='bold')
+    axs1[1, 2].set_title("Bb", weight='bold')
+    axs1[0, 0].set_ylabel('Nutrients\n[mM N]', weight='bold')
+    axs1[1, 0].set_ylabel('PON\n[mM N]', weight='bold')
+    axs1[2, 0].set_ylabel('Abundance\n[cells L$^{-1}$]', weight='bold')
+    axs1[3, 0].set_ylabel('Biomass\n[mM C]', weight='bold')
+    axs1[4, 0].set_ylabel('Mean size\n[$\mu$m$^3$]', weight='bold')
+    axs1[4, 0].set_xlabel('Time [days]', weight='bold')
+    axs1[4, 1].set_xlabel('Time [days]', weight='bold')
+    axs1[4, 2].set_xlabel('Time [days]', weight='bold')
+    fig1.subplots_adjust(wspace=0.09)
+    blackline = mlines.Line2D([], [], c='black', ls='--', lw=3.0)
+    greyline = mlines.Line2D([], [], c='grey', lw=3.0)
+    axs1[0, 0].legend([blackline, greyline], ['SBMc', 'SBMi'],
+                      loc='lower left', prop={'size': 8})
+    fig1.savefig("MREG.png", dpi=600)
+
+
 def model_benchmarking(mtype,
-                      ini_resource=0.0002, ini_density=(1e4, 1e4), min_size=(1.5e1, 1.5e4), max_size=(2.5e1, 2.5e4),
-                      spp_names=('Aa', 'Bb'), dilution_rate=0.0, volume=1.0, nsi_spp=(100, 100), nsi_min=100,
-                      nsi_max=1000, num_sc=(100, 100), time_end=10):
-    if mtype == 'sbmi_syn':
-        SBMi_syn(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
-                 max_cell_size=max_size, spp_names=spp_names, dilution_rate=dilution_rate,
-                 volume=volume, nsi_spp=nsi_spp, nsi_min=nsi_min,
-                 nsi_max=nsi_max, time_end=time_end)
-    elif mtype == 'sbmi_asyn':
+                       ini_resource=0.0002, ini_density=(1e4, 1e4), min_size=(1.5e1, 1.5e4), max_size=(2.5e1, 2.5e4),
+                       spp_names=('Aa', 'Bb'), dilution_rate=0.0, volume=1.0, nsi_spp=(100, 100), nsi_min=100,
+                       nsi_max=1000, num_sc=(100, 100), time_end=10, time_step=0.1):
+    if mtype == 'sbmi_asyn':
         SBMi_asyn(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
                   max_cell_size=max_size, spp_names=spp_names, dilution_rate=dilution_rate,
                   volume=volume, nsi_spp=nsi_spp, nsi_min=nsi_min,
-                  nsi_max=nsi_max, time_end=time_end)
+                  nsi_max=nsi_max, time_end=time_end, time_step=time_step)
     elif mtype == 'sbmc':
         SBMc(ini_resource=ini_resource, ini_density=ini_density, min_cell_size=min_size,
              max_cell_size=max_size, spp_names=spp_names, dilution_rate=dilution_rate,
              volume=volume, num_sc=num_sc, time_end=time_end)
     else:
         raise ValueError("mtype must be a string specifying the name of the "
-                         "size model type, either: sbmc, sbmi_syn, sbmi_asyn. "
+                         "size model type, either: sbmc, sbmi_asyn. "
                          "Instead got {!r}".format(mtype))
 
     """
-    Benchmarking results for size-based models on 23.04.22
+    Benchmarking results for size-based models on Apple 2.4 GHz 8-core Intel Core i9
     Model based on size classes 
       %timeit model_benchmarking('sbmc', min_size=(2e1, 2e4), max_size=(2e1, 2e4), num_sc=(1, 1))
       18.8 ms ± 824 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
@@ -766,22 +825,22 @@ def model_benchmarking(mtype,
       36.1 ms ± 1.1 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
       %timeit model_benchmarking('sbmc', num_sc=(1000, 1000))
       237 ms ± 12.2 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-    Model based on individuals with asynchronous updating
-      %timeit model_benchmarking('sbmi_asyn', nsi_min=10,nsi_max=100)
-      367 ms ± 11.3 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-      %timeit model_benchmarking('sbmi_asyn', nsi_min=100,nsi_max=1000)
-      7.1 s ± 563 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-      %timeit model_benchmarking('sbmi_asyn', nsi_min=500,nsi_max=5000)
-      1min 18s ± 1.47 s per loop (mean ± std. dev. of 7 runs, 1 loop each)
+    Model based on individuals with asynchronous updating and dt=0.1
+      %timeit model_benchmarking('sbmi_asyn', nsi_min=10, nsi_max=100)
+      202 ms ± 14.6 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+      %timeit model_benchmarking('sbmi_asyn', nsi_min=100, nsi_max=1000)
+      4.12 s ± 243 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+      %timeit model_benchmarking('sbmi_asyn', nsi_min=100, nsi_max=1900)
+      9.21 s ± 454 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
       %timeit model_benchmarking('sbmi_asyn', nsi_min=1000,nsi_max=10000)
-      4min 51s ± 1.61 s per loop (mean ± std. dev. of 7 runs, 1 loop each)
-    Model based on individuals with synchronous updating
-      %timeit model_benchmarking('sbmi_syn', nsi_min=10,nsi_max=100)
-      1.55 s ± 12.4 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-      %timeit model_benchmarking('sbmi_syn', nsi_min=100,nsi_max=1000)
-      3.6 s ± 231 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-      %timeit model_benchmarking('sbmi_syn', nsi_min=500,nsi_max=5000)
-      16 s ± 135 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-      %timeit model_benchmarking('sbmi_syn', nsi_min=1000,nsi_max=10000)
-      32.5 s ± 2.2 s per loop (mean ± std. dev. of 7 runs, 1 loop each)
+      2min 9s ± 6.76 s per loop (mean ± std. dev. of 7 runs, 1 loop each)
+    Model based on individuals with asynchronous updating and dt=0.01
+      %timeit model_benchmarking('sbmi_asyn', nsi_min=10, nsi_max=100, time_step=0.01)
+      1.47 s ± 78.8 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+      %timeit model_benchmarking('sbmi_asyn', nsi_min=100, nsi_max=1000, time_step=0.01)
+      23.5 s ± 316 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+      %timeit model_benchmarking('sbmi_asyn', nsi_min=100, nsi_max=1900, time_step=0.01)
+      59.4 s ± 506 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+      %timeit model_benchmarking('sbmi_asyn', nsi_min=1000, nsi_max=10000, time_step=0.01)
+      19min 9s ± 16.1 s per loop (mean ± std. dev. of 7 runs, 1 loop each)
     """

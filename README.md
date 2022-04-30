@@ -87,8 +87,8 @@ spp_names = ["Aa", "Bb"]
 dilution_rate = 0.0
 volume = 1.0
 nsi_spp = [500, 500]
-nsi_min = 200
-nsi_max = 2000
+nsi_min = 100
+nsi_max = 1900
 time_end = 30
 time_step = 1 / 24
 ```

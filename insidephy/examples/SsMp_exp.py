@@ -14,10 +14,10 @@ import matplotlib.gridspec as gridspec
 
 
 def sim_run(rel_size_range=0.25, ss_mp_names=['Synechococcus_sp', 'Micromonas_pusilla'],
-            nsi_spp=[500, 500], nsi_min=100, nsi_max=2000,
+            nsi_spp=[500, 500], nsi_min=100, nsi_max=1900,
             numsc=[10, 10], tend=20, dilution_rate=[0.0, 0.25, 0.50],
-            time_step=1 / 24, volume=1.0, n_procs=6, n_threads=1, mem_lim=10e9,
-            sbmc_variant=False, sbmi_asyn_variant=False, sbmi_syn_variant=False
+            time_step=0.01, volume=1.0, n_procs=6, n_threads=1, mem_lim=10e9,
+            sbmc_variant=True, sbmi_asyn_variant=True
             ):
     """
     function to compute competition experiments between two species
@@ -40,21 +40,16 @@ def sim_run(rel_size_range=0.25, ss_mp_names=['Synechococcus_sp', 'Micromonas_pu
     :return: tuple with two list containing the results for the SBMc and the SBMi model type
     """
 
-    def save_to_file(sbmc, sbmi_asyn, sbmi_syn):
+    def save_to_file(sbmc, sbmi_asyn):
         if sbmc_variant:
-            (pd.concat([exp.dtf.assign(exp='D'+str(exp._params['dilution_rate'])) for exp in sbmc])
+            (pd.concat([exp.dtf.assign(exp='D' + str(exp._params['dilution_rate'])) for exp in sbmc])
              .to_xarray()
-             .to_zarr('SsMp_exp.zarr', group='sbmc')
+             .to_zarr('SsMp_exp.zarr', group='sbmc', mode='w')
              )
         if sbmi_asyn_variant:
-            (pd.concat([exp.dtf.assign(exp='D'+str(exp._params['dilution_rate'])) for exp in sbmi_asyn])
+            (pd.concat([exp.dtf.assign(exp='D' + str(exp._params['dilution_rate'])) for exp in sbmi_asyn])
              .to_xarray()
-             .to_zarr('SsMp_exp.zarr', group='sbmi_asyn')
-             )
-        if sbmi_syn_variant:
-            (pd.concat([exp.dtf.assign(exp='D'+str(exp._params['dilution_rate'])) for exp in sbmi_syn])
-             .to_xarray()
-             .to_zarr('SsMp_exp.zarr', group='sbmi_syn')
+             .to_zarr('SsMp_exp.zarr', group='sbmi_asyn', mode='w')
              )
 
     cluster = LocalCluster(n_workers=n_procs, threads_per_worker=n_threads, memory_limit=mem_lim)
@@ -76,7 +71,6 @@ def sim_run(rel_size_range=0.25, ss_mp_names=['Synechococcus_sp', 'Micromonas_pu
 
     sbmc_out = []
     sbmi_asyn_out = []
-    sbmi_syn_out = []
     for dr in dilution_rate:
         if sbmc_variant:
             sbmc = dask.delayed(SBMc)(ini_resource=np.max(init_r) * 1. / 1e6,  # mol N/L
@@ -105,27 +99,11 @@ def sim_run(rel_size_range=0.25, ss_mp_names=['Synechococcus_sp', 'Micromonas_pu
                                                 time_end=tend
                                                 )
             sbmi_asyn_out.append(sbmi_asyn)
-        if sbmi_syn_variant:
-            sbmi_syn = dask.delayed(SBMi_syn)(ini_resource=np.max(init_r) * 1. / 1e6,  # mol N/L
-                                              ini_density=init_d,  # cells/L
-                                              min_cell_size=init_min_size,  # um^3
-                                              max_cell_size=init_max_size,  # um^3
-                                              spp_names=sp_short_names,
-                                              dilution_rate=dr,
-                                              volume=volume,
-                                              nsi_spp=nsi_spp,
-                                              nsi_min=nsi_min,
-                                              nsi_max=nsi_max,
-                                              time_step=time_step,
-                                              time_end=tend
-                                              )
-            sbmi_syn_out.append(sbmi_syn)
 
-    results = dask.delayed(save_to_file)(sbmc_out, sbmi_asyn_out, sbmi_syn_out)
+    results = dask.delayed(save_to_file)(sbmc_out, sbmi_asyn_out)
     output = dask.compute(results)
     client.close()
     cluster.close()
-    return output
 
 
 def temporal_dynamics_plot():
@@ -134,8 +112,8 @@ def temporal_dynamics_plot():
     :return: plot
     """
     Ss_Mp_data_path = pkg_resources.resource_filename('insidephy.examples', 'SsMp_exp.zarr')
-    ds_sbmc = xr.open_zarr(Ss_Mp_data_path+'/sbmc').to_dataframe()
-    ds_sbmi_asyn = xr.open_zarr(Ss_Mp_data_path+'/sbmi_asyn').to_dataframe()
+    ds_sbmc = xr.open_zarr(Ss_Mp_data_path + '/sbmc').to_dataframe()
+    ds_sbmi_asyn = xr.open_zarr(Ss_Mp_data_path + '/sbmi_asyn').to_dataframe()
 
     fig1, axs1 = plt.subplots(4, 3, sharex='col', sharey='row', figsize=(10, 8))
     # Resources plots
@@ -159,19 +137,22 @@ def temporal_dynamics_plot():
                     c='grey', ls='--', lw=3.0, alpha=0.9)
     # Quota plots
     axs1[1, 0].plot(ds_sbmc.groupby('time').time.first(),
-                    ds_sbmc.groupby(['exp', 'time']).apply(lambda x: np.sum(x.quota * x.abundance) * 1e3).loc['D0.0', :],
+                    ds_sbmc.groupby(['exp', 'time']).apply(lambda x: np.sum(x.quota * x.abundance) * 1e3).loc['D0.0',
+                    :],
                     c='black', lw=3.0, alpha=0.9)
     axs1[1, 0].plot(ds_sbmi_asyn.time.unique(),
                     ds_sbmi_asyn.groupby(['exp', 'time']).quota.sum().loc['D0.0', :] * 1e3,
                     c='grey', ls='--', lw=3.0, alpha=0.9)
     axs1[1, 1].plot(ds_sbmc.groupby('time').time.first(),
-                    ds_sbmc.groupby(['exp', 'time']).apply(lambda x: np.sum(x.quota * x.abundance) * 1e3).loc['D0.25', :],
+                    ds_sbmc.groupby(['exp', 'time']).apply(lambda x: np.sum(x.quota * x.abundance) * 1e3).loc['D0.25',
+                    :],
                     c='black', lw=3.0, alpha=0.9)
     axs1[1, 1].plot(ds_sbmi_asyn.time.unique(),
                     ds_sbmi_asyn.groupby(['exp', 'time']).quota.sum().loc['D0.25', :] * 1e3,
                     c='grey', ls='--', lw=3.0, alpha=0.9)
     axs1[1, 2].plot(ds_sbmc.groupby('time').time.first(),
-                    ds_sbmc.groupby(['exp', 'time']).apply(lambda x: np.sum(x.quota * x.abundance) * 1e3).loc['D0.5', :],
+                    ds_sbmc.groupby(['exp', 'time']).apply(lambda x: np.sum(x.quota * x.abundance) * 1e3).loc['D0.5',
+                    :],
                     c='black', lw=3.0, alpha=0.9)
     axs1[1, 2].plot(ds_sbmi_asyn.time.unique(),
                     ds_sbmi_asyn.groupby(['exp', 'time']).quota.sum().loc['D0.5', :] * 1e3,
@@ -239,71 +220,6 @@ def temporal_dynamics_plot():
     fig1.savefig('Ss_Mp_temporal_dynamics.png', dpi=600)
 
 
-def spp_weights_plot():
-    """
-    Method to plot biomass and abundance of the two species competition experiment.
-    :return: plot
-    """
-    Ss_Mp_data_path = pkg_resources.resource_filename('insidephy.examples', 'SsMp_exp.zarr')
-    ds_sbmi_asyn = xr.open_zarr(Ss_Mp_data_path + '/sbmi_asyn').to_dataframe()
-
-    cols = ['#5494aeff', '#7cb950ff']
-    fig0, axs0 = plt.subplots(2, 3, sharex='col', sharey='row', figsize=(8, 6))
-    axs0[0, 0].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.0', 'Ss', :],
-                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.0', 'Ss', :],
-                    c=cols[0], ls='--', lw=3.0)
-    axs0[0, 0].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.0', 'Mp', :],
-                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.0', 'Mp', :],
-                    c=cols[1], ls='--', lw=3.0)
-    axs0[0, 1].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.25', 'Ss', :],
-                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.25', 'Ss', :],
-                    c=cols[0], ls='--', lw=3.0)
-    axs0[0, 1].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.25', 'Mp', :],
-                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.25', 'Mp', :],
-                    c=cols[1], ls='--', lw=3.0)
-    axs0[0, 2].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.5', 'Ss', :],
-                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.5', 'Ss', :],
-                    c=cols[0], ls='--', lw=3.0)
-    axs0[0, 2].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.5', 'Mp', :],
-                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.5', 'Mp', :],
-                    c=cols[1], ls='--', lw=3.0)
-
-    axs0[1, 0].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.0', 'Ss', :],
-                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).biomass.sum().loc['D0.0', 'Ss', :],
-                    c=cols[0], ls='--', lw=3.0)
-    axs0[1, 0].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.0', 'Mp', :],
-                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).biomass.sum().loc['D0.0', 'Mp', :],
-                    c=cols[1], ls='--', lw=3.0)
-    axs0[1, 1].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.25', 'Ss', :],
-                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).biomass.sum().loc['D0.25', 'Ss', :],
-                    c=cols[0], ls='--', lw=3.0)
-    axs0[1, 1].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.25', 'Mp', :],
-                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).biomass.sum().loc['D0.25', 'Mp', :],
-                    c=cols[1], ls='--', lw=3.0)
-    axs0[1, 2].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.5', 'Ss', :],
-                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).biomass.sum().loc['D0.5', 'Ss', :],
-                    c=cols[0], ls='--', lw=3.0)
-    axs0[1, 2].plot(ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).time.first().loc['D0.5', 'Mp', :],
-                    ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).biomass.sum().loc['D0.5', 'Mp', :],
-                    c=cols[1], ls='--', lw=3.0)
-
-    axs0[1, 0].set_yscale('log')
-    axs0[0, 0].set_yscale('log')
-    axs0[0, 0].set_title('0% dilution rate', weight='bold')
-    axs0[0, 1].set_title('25% dilution rate', weight='bold')
-    axs0[0, 2].set_title('50% dilution rate', weight='bold')
-    axs0[0, 0].set_ylabel('Abundance\n[cells L$^{-1}$]', weight='bold')
-    axs0[1, 0].set_ylabel('Biomass\n[mM C]', weight='bold')
-    axs0[1, 0].set_xlabel('Time [days]', weight='bold')
-    axs0[1, 1].set_xlabel('Time [days]', weight='bold')
-    axs0[1, 2].set_xlabel('Time [days]', weight='bold')
-    Ssline = mlines.Line2D([], [], c=cols[0], ls='--', lw=3.0)
-    Mpline = mlines.Line2D([], [], c=cols[1], ls='--', lw=3.0)
-    axs0[0, 0].legend([Ssline, Mpline], ['Ss', 'Mp'], loc='lower right')
-    fig0.subplots_adjust(wspace=0.1, hspace=0.1)
-    fig0.savefig('Ss_Mp_weights.png', dpi=600)
-
-
 def distribution_plot():
     """
     Species size distributions at specific time steps from the two species competition experiment.
@@ -364,35 +280,16 @@ def distribution_plot():
              ds_sbmi_asyn.groupby(['exp', 'spp', 'time']).rep_nind.sum().loc['D0.5', 'Mp', :],
              c=cols[1], lw=3.0)
 
-    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.0', ds_sbmi_asyn.time==0)],
-                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
-                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax7)
-    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.0', ds_sbmi_asyn.time==10)],
-                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
-                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax10)
-    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.0', ds_sbmi_asyn.time==20)],
-                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
-                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax13)
+    axs_dist = [ax7, ax10, ax13, ax8, ax11, ax14, ax9, ax12, ax15]
+    d_rates = ['D0.0', 'D0.0', 'D0.0', 'D0.25', 'D0.25', 'D0.25', 'D0.5', 'D0.5', 'D0.5']
+    t_step_sbmi = [0, 10, 20, 0, 10, 20, 0, 10, 20]
 
-    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.25', ds_sbmi_asyn.time==0)],
-                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
-                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax8)
-    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.25', ds_sbmi_asyn.time==10)],
-                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
-                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax11, )
-    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.25', ds_sbmi_asyn.time==20)],
-                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
-                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax14)
-
-    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.5', ds_sbmi_asyn.time==0)],
-                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
-                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax9)
-    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.5', ds_sbmi_asyn.time==10)],
-                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
-                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax12)
-    sns.kdeplot(data=ds_sbmi_asyn[np.logical_and(ds_sbmi_asyn.exp=='D0.5', ds_sbmi_asyn.time==20)],
-                x='cell_size', weights='rep_nind', hue='spp', palette=cols,
-                legend=False, cut=5, fill=True, multiple='stack', linewidth=0.5, ax=ax15)
+    for axd, dr, ti in zip(axs_dist, d_rates, t_step_sbmi):
+        sns.kdeplot(
+            data=ds_sbmi_asyn.loc[
+                (ds_sbmi_asyn.exp == dr) & (ds_sbmi_asyn.time == ti)],
+            x='cell_size', weights='rep_nind', hue='spp', palette=cols, common_norm=True,
+            legend=False, cut=5, linewidth=0.5, fill=True, ax=axd, alpha=0.9)
 
     for ax in [ax1, ax2, ax3]:
         ax.set_xlim(0, 20)
@@ -422,13 +319,12 @@ def distribution_plot():
     for ax in fig.axes[6:9]:
         ax.set_ylim(0, 3)
 
-    for ax in fig.axes[9:12]:
-        ax.set_ylim(0, 1.5)
+    for ax in fig.axes[9:]:
+        ax.set_ylim(0, 2)
 
     for ax in fig.axes[12:]:
         ax.set_xlabel('Cell size [$\mu$m$^{3}$]', size=11, fontweight="bold")
         ax.tick_params(labelbottom=True)
-        ax.set_ylim(0, 0.4)
 
     ax1.tick_params(labelleft=True)
     ax4.tick_params(labelleft=True)
@@ -450,5 +346,4 @@ def distribution_plot():
 if __name__ == "__main__":
     sim_run()
     temporal_dynamics_plot()
-    spp_weights_plot()
     distribution_plot()

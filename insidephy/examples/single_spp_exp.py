@@ -8,7 +8,7 @@ from dask.distributed import Client, LocalCluster
 
 def single_spp_sims(rel_size_range, dilution=0.0, volume=1, time_end=20,
                     sbmc_numsc=[1], sbmi_nsispp=[500], sbmi_nsimin=100,
-                    sbmi_nsimax=1000, sbmi_ts=1 / 24, init_size=('mean', 'min'),
+                    sbmi_nsimax=1900, sbmi_ts=1 / 24, init_size=('mean', 'min'),
                     n_procs=6, n_threads=1, mem_lim=10e9,
                     sbmc_variant=False, sbmi_asyn_variant=False, sbmi_syn_variant=False):
     """

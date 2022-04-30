@@ -9,7 +9,7 @@ from dask.distributed import Client, LocalCluster
 
 
 def multiple_spp_sims(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0, time_end=20,
-                      sbmc_numsc=[10], sbmi_nsispp=[101], sbmi_nsimin=100, sbmi_nsimax=1000, sbmi_ts=1 / 24,
+                      sbmc_numsc=[10], sbmi_nsispp=[101], sbmi_nsimin=100, sbmi_nsimax=1900, sbmi_ts=0.01,
                       sbmc_variant=False, sbmi_asyn_variant=False, sbmi_syn_variant=False,
                       n_procs=6, n_threads=1, mem_lim=10e9, outfname_base='Multiple_spp_exp_'):
     cluster = LocalCluster(n_workers=n_procs, threads_per_worker=n_threads, memory_limit=mem_lim)
@@ -85,7 +85,7 @@ def multiple_spp_sims(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0
                                                 volume=volume,
                                                 nsi_spp=sbmi_nsispp * num_spp_exp,
                                                 nsi_min=sbmi_nsimin,
-                                                nsi_max=sbmi_nsimax + (sbmi_nsimin * num_spp_exp),
+                                                nsi_max=sbmi_nsimax,
                                                 time_step=sbmi_ts,
                                                 time_end=time_end
                                                 )
@@ -100,7 +100,7 @@ def multiple_spp_sims(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0
                                               volume=volume,
                                               nsi_spp=sbmi_nsispp * num_spp_exp,
                                               nsi_min=sbmi_nsimin,
-                                              nsi_max=sbmi_nsimax + (sbmi_nsimin * num_spp_exp),
+                                              nsi_max=sbmi_nsimax,
                                               time_step=sbmi_ts,
                                               time_end=time_end
                                               )
@@ -114,11 +114,11 @@ def multiple_spp_sims(num_spp_exp, rel_size_range=0.25, dilution=0.0, volume=1.0
 
 
 if __name__ == "__main__":
-    multiple_spp_sims(2, rel_size_range=0, sbmc_numsc=[1], sbmi_ts=0.01,
+    multiple_spp_sims(2, rel_size_range=0, sbmc_numsc=[1],
                       sbmc_variant=True, sbmi_asyn_variant=True, outfname_base='Two_spp_exp_0percent')
-    multiple_spp_sims(2, rel_size_range=0.25, sbmc_numsc=[10], sbmi_ts=0.01,
+    multiple_spp_sims(2, rel_size_range=0.25, sbmc_numsc=[10],
                       sbmc_variant=True, sbmi_asyn_variant=True, outfname_base='Two_spp_exp_25percent')
-    multiple_spp_sims(2, rel_size_range=0.50, sbmc_numsc=[10], sbmi_ts=0.01,
+    multiple_spp_sims(2, rel_size_range=0.50, sbmc_numsc=[10],
                       sbmc_variant=True, sbmi_asyn_variant=True, outfname_base='Two_spp_exp_50percent')
-    multiple_spp_sims(2, rel_size_range=0.75, sbmc_numsc=[10], sbmi_ts=0.01,
+    multiple_spp_sims(2, rel_size_range=0.75, sbmc_numsc=[10],
                       sbmc_variant=True, sbmi_asyn_variant=True, outfname_base='Two_spp_exp_75percent')

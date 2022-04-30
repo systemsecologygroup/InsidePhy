@@ -56,12 +56,12 @@ def size_var_comp_sbmi(dtf, weight_col='rep_nind',  log_trans=True):
         dtf = dtf.assign(cell_size=log_cell_size_i_n, cell_size_lin=cell_size_i_n)
 
     no_ind_i = dtf.groupby('spp').sum()[weight_col]
-    mean_size_i = dtf.groupby('spp').apply(lambda x: np.sum(x.cell_size * x[weight_col]) / x[weight_col].sum())
-    mean_size_com = np.sum(no_ind_i / no_ind_i.sum() * mean_size_i)
-    between_var = np.sum(no_ind_i / no_ind_i.sum() * (mean_size_i - mean_size_com) ** 2)
-    within_i_ss = dtf.groupby('spp').apply(lambda x: np.sum(
-        x[weight_col] / x[weight_col].sum() * (x.cell_size - (np.sum(x.cell_size * x[weight_col]) / x[weight_col].sum())) ** 2))
-    within_var = np.sum((no_ind_i / no_ind_i.sum() * within_i_ss))
+    mean_size_i = dtf.groupby('spp').apply(lambda x: np.nansum(x.cell_size * x[weight_col]) / x[weight_col].sum())
+    mean_size_com = np.nansum(no_ind_i / no_ind_i.sum() * mean_size_i)
+    between_var = np.nansum(no_ind_i / no_ind_i.sum() * (mean_size_i - mean_size_com) ** 2)
+    within_i_ss = dtf.groupby('spp').apply(lambda x: np.nansum(
+        x[weight_col] / x[weight_col].sum() * (x.cell_size - (np.nansum(x.cell_size * x[weight_col]) / x[weight_col].sum())) ** 2))
+    within_var = np.nansum((no_ind_i / no_ind_i.sum() * within_i_ss))
     tot_var_ss = dtf.groupby('spp').apply(
         lambda x: np.sum(x[weight_col] / x[weight_col].sum() * (x.cell_size - mean_size_com) ** 2))
     tot_var = np.sum((no_ind_i / no_ind_i.sum() * tot_var_ss))
