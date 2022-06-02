@@ -441,7 +441,11 @@ def figure6():
         """
         wmean = np.nansum(values * weight, axis=axis) / np.nansum(weight, axis=axis)
         wvar = np.nansum(values ** 2 * weight, axis=axis) / np.nansum(weight, axis=axis) - wmean ** 2
-        return np.sqrt(wvar) / wmean
+        if wvar < 0:
+            cv = 0
+        else:
+            cv = np.sqrt(wvar) / wmean
+        return cv
 
     list_files = ['Single_spp_exp_0percent.zarr', 'Single_spp_exp_25percent.zarr',
                   'Single_spp_exp_50percent.zarr', 'Single_spp_exp_75percent.zarr']
@@ -463,25 +467,25 @@ def figure6():
     for fname, ncol in zip(list_files, np.arange(4)):
         sbm_data_path = pkg_resources.resource_filename('insidephy.examples', fname)
         sbmc = xr.open_zarr(sbm_data_path + '/sbmc').to_dataframe()
-        sbmcbysppt = (sbmc.groupby(['spp', 'time'])
+        sbmcbysppt = (sbmc.groupby(['spp'])
                       .apply(lambda x: coefvar(x.cell_size, x.abundance))
                       .reset_index()
                       .rename(columns={0: 'CV'})
                       )
         sbmi = xr.open_zarr(sbm_data_path + '/sbmi_asyn').to_dataframe()
-        sbmibysppt = (sbmi.groupby(['spp', 'time'])
+        sbmibysppt = (sbmi.groupby(['spp'])
                       .apply(lambda x: coefvar(x.cell_size, x.rep_nind))
                       .reset_index()
                       .rename(columns={0: 'CV'})
                       )
 
-        PFT_c = np.repeat(['Dino', 'Dino', 'Dino', 'Cocco', 'Diatom', 'Diatom', 'Diatom', 'Cocco', 'Cocco',
+        PFT_c = ['Dino', 'Dino', 'Dino', 'Cocco', 'Diatom', 'Diatom', 'Diatom', 'Cocco', 'Cocco',
                            'Cocco', 'Diatom', 'Chloro', 'Other', 'Chloro', 'Other', 'Diatom', 'Cyano', 'Dino',
-                           'Diatom', 'Cyano', 'Diatom', 'Diatom'], sbmc.time.unique().size)
+                           'Diatom', 'Cyano', 'Diatom', 'Diatom']
 
-        PFT_i = np.repeat(['Dino', 'Dino', 'Dino', 'Cocco', 'Diatom', 'Diatom', 'Diatom', 'Cocco', 'Cocco',
+        PFT_i = ['Dino', 'Dino', 'Dino', 'Cocco', 'Diatom', 'Diatom', 'Diatom', 'Cocco', 'Cocco',
                            'Cocco', 'Diatom', 'Chloro', 'Other', 'Chloro', 'Other', 'Diatom', 'Cyano', 'Dino',
-                           'Diatom', 'Cyano', 'Diatom', 'Diatom'], sbmi.time.unique().size)
+                           'Diatom', 'Cyano', 'Diatom', 'Diatom']
 
         pfts = ['Cyano', 'Chloro', 'Other', 'Cocco', 'Diatom', 'Dino']
         spp_name_tag = ['Ps', 'Ss', 'Ot', 'Ng', 'Mp', 'Pl', 'Cl', 'Ig', 'Go', 'Pt', 'Eh', 'Sc',
@@ -490,9 +494,9 @@ def figure6():
         sbmibysppt['Species'] = pd.Categorical(sbmibysppt['spp'], spp_name_tag)
 
         sns.scatterplot(x='CV', y="Species", data=sbmibysppt, hue=PFT_i,
-                        hue_order=pfts, alpha=.50, ax=axs6[0, ncol], legend=False, zorder=3, clip_on=False)
+                        hue_order=pfts, alpha=.95, ax=axs6[0, ncol], legend=False, zorder=3, clip_on=False)
         sns.scatterplot(x='CV', y="Species", data=sbmcbysppt, hue=PFT_c,
-                        hue_order=pfts, alpha=.50, ax=axs6[1, ncol], legend=False, zorder=3, clip_on=False)
+                        hue_order=pfts, alpha=.95, ax=axs6[1, ncol], legend=False, zorder=3, clip_on=False)
 
     for ax in axs6.ravel():
         sns.scatterplot(x='CV', y='Spp_name_short', data=obsCV, alpha=.90, marker='P', color='black', zorder=10,
